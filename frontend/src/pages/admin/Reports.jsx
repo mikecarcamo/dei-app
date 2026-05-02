@@ -21,7 +21,8 @@ function ConsolidatedDialog({ open, event, onClose }) {
   const handleDownload = async () => {
     setDownloading(true);
     try {
-      const url = `http://localhost:4000/api/reports/consolidated/${event.id}?detail=${includeDetail}`;
+      const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+      const url = `${baseURL}/reports/consolidated/${event.id}?detail=${includeDetail}`;
       const token = localStorage.getItem('dei_token');
       const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
       const blob = await response.blob();
@@ -127,7 +128,8 @@ function EventResponses({ event }) {
 
   const handleDownloadIndividual = async (responseId, name) => {
     const token = localStorage.getItem('dei_token');
-    const response = await fetch(`http://localhost:4000/api/reports/individual/${responseId}`, {
+    const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+    const response = await fetch(`${baseURL}/reports/individual/${responseId}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     const blob = await response.blob();
