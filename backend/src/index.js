@@ -55,31 +55,23 @@ app.get('/api/restore-seed-db', (req, res) => {
   try {
     const path = require('path');
     const fs = require('fs');
-    const Database = require('better-sqlite3');
     const liveDb = require('./db/database');
-    const seedPath = path.resolve(__dirname, '../data/seed/dei.sqlite');
-    const altPath = path.resolve(process.cwd(), 'data/seed/dei.sqlite');
-    const usePath = fs.existsSync(seedPath) ? seedPath : fs.existsSync(altPath) ? altPath : null;
-    if (!usePath) return res.status(404).json({ error: 'seed no encontrado', tried: [seedPath, altPath], cwd: process.cwd(), __dirname });
-    const seedDb = new Database(usePath, { readonly: true });
-
+    const candidates = [
+      path.resolve(__dirname, '../data/seed/dei.sqlite'),
+      path.resolve(process.cwd(), 'data/seed/dei.sqlite'),
+    ];
+    const usePath = candidates.find(p => fs.existsSync(p));
+    if (!usePath) return res.status(404).json({ error: 'seed no encontrado', tried: candidates });
     const tables = ['entities','tests','questions','options','users','licenses','events','event_users','responses','response_answers'];
     let counts = {};
-
-    for (const table of tables) {
+    liveDb.prepare(`ATTACH DATABASE '${usePath}' AS seed`).run();
+    for (const t of tables) {
       try {
-        const rows = seedDb.prepare(`SELECT * FROM ${table}`).all();
-        if (rows.length === 0) { counts[table] = 0; continue; }
-        const cols = Object.keys(rows[0]);
-        const placeholders = cols.map(() => '?').join(',');
-        const colNames = cols.join(',');
-        const stmt = liveDb.prepare(`INSERT OR IGNORE INTO ${table} (${colNames}) VALUES (${placeholders})`);
-        const insertMany = liveDb.transaction((items) => { for (const r of items) stmt.run(Object.values(r)); });
-        insertMany(rows);
-        counts[table] = rows.length;
-      } catch(e) { counts[table] = `error: ${e.message}`; }
+        const r = liveDb.prepare(`INSERT OR IGNORE INTO main.${t} SELECT * FROM seed.${t}`).run();
+        counts[t] = r.changes;
+      } catch(e) { counts[t] = `error: ${e.message}`; }
     }
-    seedDb.close();
+    liveDb.prepare(`DETACH DATABASE seed`).run();
     res.json({ ok: true, counts });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });

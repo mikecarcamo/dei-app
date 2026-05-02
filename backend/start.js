@@ -13,9 +13,25 @@ if (!fs.existsSync(resolvedDb) && fs.existsSync(seedDb)) {
 }
 
 require('./src/db/migrate');
-try {
-  require('./src/db/seed');
-} catch (e) {
-  console.error('Seed error (non-fatal):', e.message);
+require('./src/db/migrate_burnout');
+require('./src/db/migrate_response_answers');
+
+const seeds = ['./src/db/seed', './src/db/seed_burnout'];
+for (const s of seeds) {
+  try { require(s); } catch (e) { console.error(`Seed error (${s}):`, e.message); }
 }
+
+// Seeds de respuestas solo si la BD está vacía
+try {
+  const db = require('./src/db/database');
+  const count = db.prepare('SELECT COUNT(*) as c FROM responses').get().c;
+  if (count === 0) {
+    console.log('BD vacía, insertando respuestas de ejemplo...');
+    try { require('./src/db/seed_personalidad'); } catch(e) { console.error('seed_personalidad error:', e.message); }
+    try { require('./src/db/seed_burnout_70'); } catch(e) { console.error('seed_burnout_70 error:', e.message); }
+  } else {
+    console.log(`BD con ${count} respuestas existentes, omitiendo seeds de respuestas.`);
+  }
+} catch(e) { console.error('Error verificando responses:', e.message); }
+
 require('./src/index');
