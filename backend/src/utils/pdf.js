@@ -3,6 +3,18 @@ const path = require('path');
 const { TEMPERAMENT_LABELS } = require('./scoring');
 
 const FIRMA_PATH = path.join(__dirname, 'FIRMASELLOMICH.png');
+const LOGO_PATH = path.join(__dirname, 'Logo.png');
+
+function drawWatermark(doc) {
+  const w = 300;
+  const h = 300;
+  const x = (doc.page.width - w) / 2;
+  const y = (doc.page.height - h) / 2;
+  doc.save();
+  doc.opacity(0.06);
+  doc.image(LOGO_PATH, x, y, { fit: [w, h], align: 'center', valign: 'center' });
+  doc.restore();
+}
 
 const COLORS = {
   primary: '#1565C0',
@@ -480,4 +492,4 @@ function generateConsolidatedPDF(doc, event, responses, includeDetail = false, i
 
 }
 
-module.exports = { generateIndividualPDF, generateConsolidatedPDF, appendDisclaimer };
+module.exports = { generateIndividualPDF, generateConsolidatedPDF, appendDisclaimer, drawWatermark };

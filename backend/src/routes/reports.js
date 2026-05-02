@@ -3,7 +3,14 @@ const router = express.Router();
 const PDFDocument = require('pdfkit');
 const db = require('../db/database');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
-const { generateIndividualPDF, generateConsolidatedPDF, appendDisclaimer } = require('../utils/pdf');
+const { generateIndividualPDF, generateConsolidatedPDF, appendDisclaimer, drawWatermark } = require('../utils/pdf');
+
+function createDoc() {
+  const doc = new PDFDocument({ margin: 40, size: 'A4' });
+  drawWatermark(doc);
+  doc.on('pageAdded', () => drawWatermark(doc));
+  return doc;
+}
 
 router.get('/individual/:responseId', verifyToken, (req, res) => {
   const response = db.prepare(`SELECT * FROM responses WHERE id = ?`).get(req.params.responseId);
@@ -41,7 +48,7 @@ router.get('/individual/:responseId', verifyToken, (req, res) => {
     return { ...ans, options_summary: summary };
   });
 
-  const doc = new PDFDocument({ margin: 40, size: 'A4' });
+  const doc = createDoc();
   const safeName = (response.participant_full_name || 'resultado').replace(/[^a-zA-Z0-9_\-\s]/g, '').replace(/\s+/g, '_');
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="resultado_${safeName}.pdf"`);
@@ -99,7 +106,7 @@ router.get('/consolidated/:eventId', verifyToken, (req, res) => {
     });
   }
 
-  const doc = new PDFDocument({ margin: 40, size: 'A4' });
+  const doc = createDoc();
   const safeName = (event.name || 'evento').replace(/[^a-zA-Z0-9_\-\s]/g, '').replace(/\s+/g, '_');
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="consolidado_${safeName}.pdf"`);
