@@ -68,7 +68,7 @@ function appendDisclaimer(doc) {
 
 function markDarkPage(doc) {
   if (!doc._darkPages) doc._darkPages = [];
-  const idx = doc.bufferedPageRange ? doc.bufferedPageRange().start + doc.bufferedPageRange().count - 1 : 0;
+  const idx = doc._pageBuffer ? doc._pageBuffer.length - 1 : 0;
   doc._darkPages.push(idx);
 }
 
