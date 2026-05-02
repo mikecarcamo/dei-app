@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["nodejs_20", "python3", "make", "gcc"]
+nixPkgs = ["nodejs_20", "python3", "gnumake", "gcc"]
 
 [start]
 cmd = "node src/db/migrate.js && node src/index.js"
