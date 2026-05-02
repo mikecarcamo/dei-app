@@ -145,7 +145,9 @@ function drawBurnoutAnswersDetail(doc, y, answers) {
     }
     if (y > doc.page.height - 60) { doc.addPage(); y = 50; }
     const bg = ans.number % 2 === 0 ? '#FBE9E7' : COLORS.white;
-    doc.rect(40, y - 2, doc.page.width - 80, 22).fill(bg);
+    doc.save();
+    doc.fillOpacity(0.55).rect(40, y - 2, doc.page.width - 80, 22).fill(bg);
+    doc.restore();
     doc.fontSize(9).font('Helvetica-Bold').fillColor(COLORS.burnout).text(`${ans.number}.`, 42, y + 2, { width: 20 });
     doc.fontSize(9).font('Helvetica').fillColor(COLORS.text).text(ans.question_text || '—', 62, y + 2, { width: 350 });
     const val = ans.numeric_value ?? 0;
@@ -341,7 +343,9 @@ function drawAnswersDetail(doc, ay, answers) {
     }
     if (ay > doc.page.height - 80) { doc.addPage(); ay = 50; }
     const bg = ans.number % 2 === 0 ? '#FAFAFA' : COLORS.white;
-    doc.rect(40, ay - 2, doc.page.width - 80, 28).fill(bg);
+    doc.save();
+    doc.fillOpacity(0.55).rect(40, ay - 2, doc.page.width - 80, 28).fill(bg);
+    doc.restore();
     doc.fontSize(9).font('Helvetica-Bold').fillColor(COLORS.secondary).text(`${ans.number}.`, 42, ay + 2, { width: 20 });
     const optionsText = ans.options_summary || ans.question_text;
     doc.fontSize(9).font('Helvetica').fillColor(COLORS.text).text(optionsText, 62, ay + 2, { width: 320 });
