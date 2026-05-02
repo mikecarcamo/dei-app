@@ -58,10 +58,13 @@ app.get('/api/restore-seed-db', (req, res) => {
     const liveDb = require('./db/database');
     const candidates = [
       path.resolve(__dirname, '../data/seed/dei.sqlite'),
+      path.resolve(__dirname, '../../data/seed/dei.sqlite'),
       path.resolve(process.cwd(), 'data/seed/dei.sqlite'),
+      '/app/data/seed/dei.sqlite',
+      '/app/backend/data/seed/dei.sqlite',
     ];
     const usePath = candidates.find(p => fs.existsSync(p));
-    if (!usePath) return res.status(404).json({ error: 'seed no encontrado', tried: candidates });
+    if (!usePath) return res.status(404).json({ error: 'seed no encontrado', tried: candidates, __dirname, cwd: process.cwd() });
     const tables = ['entities','tests','questions','options','users','licenses','events','event_users','responses','response_answers'];
     let counts = {};
     liveDb.prepare(`ATTACH DATABASE '${usePath}' AS seed`).run();
