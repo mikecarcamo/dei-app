@@ -51,6 +51,34 @@ app.get('/api/debug-users', (req, res) => {
   res.json({ dbPath, users });
 });
 
+app.get('/api/restore-seed-db', (req, res) => {
+  try {
+    const path = require('path');
+    const Database = require('better-sqlite3');
+    const liveDb = require('./db/database');
+    const seedDb = new Database(path.resolve(__dirname, '../data/seed/dei.sqlite'), { readonly: true });
+
+    const tables = ['entities','tests','questions','options','users','licenses','events','event_users','responses','response_answers'];
+    let counts = {};
+
+    for (const table of tables) {
+      try {
+        const rows = seedDb.prepare(`SELECT * FROM ${table}`).all();
+        if (rows.length === 0) { counts[table] = 0; continue; }
+        const cols = Object.keys(rows[0]);
+        const placeholders = cols.map(() => '?').join(',');
+        const colNames = cols.join(',');
+        const stmt = liveDb.prepare(`INSERT OR IGNORE INTO ${table} (${colNames}) VALUES (${placeholders})`);
+        const insertMany = liveDb.transaction((items) => { for (const r of items) stmt.run(Object.values(r)); });
+        insertMany(rows);
+        counts[table] = rows.length;
+      } catch(e) { counts[table] = `error: ${e.message}`; }
+    }
+    seedDb.close();
+    res.json({ ok: true, counts });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/reset-admin', (req, res) => {
   try {
     const db = require('./db/database');
