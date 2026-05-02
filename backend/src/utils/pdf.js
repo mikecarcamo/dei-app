@@ -212,8 +212,12 @@ function generateBurnoutPDF(doc, response, event, answers) {
 
   if (answers && answers.length > 0) {
     doc.addPage();
-    let ay = drawHeader(doc, 'Detalle de Respuestas', response.participant_full_name);
-    ay += 10;
+    markDarkPage(doc);
+    doc.rect(0, 0, doc.page.width, 90).fill(COLORS.burnout);
+    doc.fillColor(COLORS.white).fontSize(22).font('Helvetica-Bold').text('Detalle de Respuestas', 40, 25, { align: 'center' });
+    doc.fontSize(11).font('Helvetica').text(response.participant_full_name, 40, 55, { align: 'center', width: doc.page.width - 80 });
+    doc.fillColor(COLORS.text);
+    let ay = 110;
     drawBurnoutAnswersDetail(doc, ay, answers);
   }
 }
@@ -451,9 +455,12 @@ function generateConsolidatedPDF(doc, event, responses, includeDetail = false, i
 
         if (includeAnswers && r.answers && r.answers.length > 0) {
           doc.addPage();
-          let ay = drawHeader(doc, 'Detalle de Respuestas', r.participant_full_name);
-          ay += 10;
-          drawBurnoutAnswersDetail(doc, ay, r.answers);
+          markDarkPage(doc);
+          doc.rect(0, 0, doc.page.width, 90).fill(COLORS.burnout);
+          doc.fillColor(COLORS.white).fontSize(22).font('Helvetica-Bold').text('Detalle de Respuestas', 40, 25, { align: 'center' });
+          doc.fontSize(11).font('Helvetica').text(r.participant_full_name, 40, 55, { align: 'center', width: doc.page.width - 80 });
+          doc.fillColor(COLORS.text);
+          drawBurnoutAnswersDetail(doc, 110, r.answers);
         }
       }
     }
