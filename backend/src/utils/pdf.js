@@ -396,8 +396,8 @@ function generateConsolidatedPDF(doc, event, responses, includeDetail = false, i
     doc.fontSize(13).font('Helvetica-Bold').fillColor(COLORS.burnout).text('LISTADO DE PARTICIPANTES', 40, y);
     y += 20;
 
-    const colW = [25, 160, 65, 65, 65, 65, 65, 50];
-    const colX = [40, 65, 225, 290, 355, 420, 485, 535];
+    const colW = [25, 130, 55, 65, 55, 65, 65, 80];
+    const colX = [40, 65, 195, 250, 315, 370, 435, 500];
     const hdrs = ['#', 'Nombre', 'CE', 'CE Niv.', 'DP', 'DP Niv.', 'RP Niv.', 'Fecha'];
 
     doc.rect(40, y, doc.page.width - 80, 20).fill(COLORS.burnout);
