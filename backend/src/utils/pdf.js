@@ -60,7 +60,6 @@ function drawSignature(doc, y) {
 }
 
 function appendDisclaimer(doc) {
-  doc.flushPages();
   doc.moveDown(2);
   doc.fontSize(8).font('Helvetica-Oblique').fillColor(COLORS.warning)
     .text(FOOTER_TEXT, 40, null, { align: 'center', width: doc.page.width - 80 });
