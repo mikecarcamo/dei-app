@@ -1,0 +1,74 @@
+const express = require('express');
+const router = express.Router();
+const PDFDocument = require('pdfkit');
+const db = require('../db/database');
+const { verifyToken, requireAdmin } = require('../middleware/auth');
+const { generateIndividualPDF, generateConsolidatedPDF, appendDisclaimer } = require('../utils/pdf');
+
+router.get('/individual/:responseId', verifyToken, (req, res) => {
+  const response = db.prepare(`SELECT * FROM responses WHERE id = ?`).get(req.params.responseId);
+  if (!response) return res.status(404).json({ message: 'Respuesta no encontrada' });
+
+  if (req.user.role !== 'ADMIN') {
+    const event = db.prepare(`SELECT entity_id FROM events WHERE id = ?`).get(response.event_id);
+    const assignedToEvent = db.prepare(`SELECT id FROM event_users WHERE event_id = ? AND user_id = ?`).get(response.event_id, req.user.id);
+    if (!event || (event.entity_id !== req.user.entity_id && !assignedToEvent)) {
+      return res.status(403).json({ message: 'Sin acceso' });
+    }
+  }
+
+  const event = db.prepare(`
+    SELECT ev.*, e.name as entity_name, t.name as test_name, t.test_type
+    FROM events ev
+    JOIN entities e ON ev.entity_id = e.id
+    JOIN tests t ON ev.test_id = t.id
+    WHERE ev.id = ?
+  `).get(response.event_id);
+
+  const answers = db.prepare(`
+    SELECT ra.*, q.number, q.text as question_text, q.section,
+           o.text as option_text, o.temperament
+    FROM response_answers ra
+    JOIN questions q ON ra.question_id = q.id
+    LEFT JOIN options o ON ra.selected_option_id = o.id
+    WHERE ra.response_id = ?
+    ORDER BY q.number
+  `).all(response.id);
+
+  const doc = new PDFDocument({ margin: 40, size: 'A4' });
+  const safeName = (response.participant_full_name || 'resultado').replace(/[^a-zA-Z0-9_\-\s]/g, '').replace(/\s+/g, '_');
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="resultado_${safeName}.pdf"`);
+  doc.pipe(res);
+  generateIndividualPDF(doc, response, event, answers);
+  appendDisclaimer(doc);
+  doc.end();
+});
+
+router.get('/consolidated/:eventId', verifyToken, requireAdmin, (req, res) => {
+  const event = db.prepare(`
+    SELECT ev.*, e.name as entity_name, t.name as test_name, t.test_type
+    FROM events ev
+    JOIN entities e ON ev.entity_id = e.id
+    JOIN tests t ON ev.test_id = t.id
+    WHERE ev.id = ?
+  `).get(req.params.eventId);
+
+  if (!event) return res.status(404).json({ message: 'Evento no encontrado' });
+
+  const responses = db.prepare(`
+    SELECT * FROM responses WHERE event_id = ? AND annulled = 0 ORDER BY submitted_at
+  `).all(req.params.eventId);
+
+  const includeDetail = req.query.detail === 'true';
+  const doc = new PDFDocument({ margin: 40, size: 'A4' });
+  const safeName = (event.name || 'evento').replace(/[^a-zA-Z0-9_\-\s]/g, '').replace(/\s+/g, '_');
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="consolidado_${safeName}.pdf"`);
+  doc.pipe(res);
+  generateConsolidatedPDF(doc, event, responses, includeDetail);
+  appendDisclaimer(doc);
+  doc.end();
+});
+
+module.exports = router;
