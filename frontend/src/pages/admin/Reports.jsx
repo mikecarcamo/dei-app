@@ -55,7 +55,7 @@ function ConsolidatedDialog({ open, event, onClose }) {
   );
 }
 
-function ResponseDetail({ responseId }) {
+function ResponseDetail({ responseId, testType }) {
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -67,6 +67,38 @@ function ResponseDetail({ responseId }) {
 
   if (loading) return <CircularProgress size={20} />;
   if (!detail) return null;
+
+  const isBurnout = testType === 'BURNOUT';
+
+  if (isBurnout) {
+    const nivelColor = (n) => n === 'ALTO' ? '#EF5350' : n === 'MEDIO' ? '#FFA726' : '#66BB6A';
+    const diagColor = detail.burnout_diagnostico === 'BURNOUT' ? 'error' : detail.burnout_diagnostico === 'RIESGO' ? 'warning' : 'success';
+    return (
+      <Box sx={{ bgcolor: '#F9FAFB', p: 2, borderRadius: 2 }}>
+        <Box display="flex" gap={2} flexWrap="wrap" mb={2}>
+          <Chip label={`Diagnóstico: ${detail.burnout_diagnostico}`} color={diagColor} />
+        </Box>
+        <Box mb={2}>
+          {[
+            { label: 'Agotamiento Emocional', score: detail.burnout_ce, nivel: detail.burnout_ce_nivel, max: 54 },
+            { label: 'Despersonalización', score: detail.burnout_dp, nivel: detail.burnout_dp_nivel, max: 30 },
+            { label: 'Realización Personal', score: detail.burnout_rp, nivel: detail.burnout_rp_nivel, max: 48 },
+          ].map(item => (
+            <Box key={item.label} display="flex" alignItems="center" gap={1} mb={0.5}>
+              <Typography variant="caption" sx={{ width: 160 }}>{item.label}</Typography>
+              <LinearProgress variant="determinate" value={item.max > 0 ? (item.score / item.max) * 100 : 0}
+                sx={{ flex: 1, height: 8, borderRadius: 4, bgcolor: '#E0E0E0', '& .MuiLinearProgress-bar': { bgcolor: nivelColor(item.nivel) } }} />
+              <Typography variant="caption" fontWeight={700} sx={{ width: 30, textAlign: 'right' }}>{item.score}</Typography>
+              <Chip label={item.nivel} size="small" sx={{ bgcolor: nivelColor(item.nivel), color: '#fff', fontSize: 10, height: 18 }} />
+            </Box>
+          ))}
+        </Box>
+        <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'pre-line', display: 'block', fontSize: 11 }}>
+          {detail.conclusion}
+        </Typography>
+      </Box>
+    );
+  }
 
   const domLabel = (detail.dominant_temperament || '').replace('SANGUINEO', 'Sanguíneo').replace('COLERICO', 'Colérico').replace('MELANCOLICO', 'Melancólico').replace('FLEMATICO', 'Flemático');
   const secLabel = detail.secondary_temperament ? (TEMP_LABELS[detail.secondary_temperament] || detail.secondary_temperament) : '—';
@@ -101,6 +133,7 @@ function ResponseDetail({ responseId }) {
 }
 
 function EventResponses({ event }) {
+  const isBurnout = event.test_type === 'BURNOUT';
   const [responses, setResponses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -167,8 +200,8 @@ function EventResponses({ event }) {
             <TableHead>
               <TableRow sx={{ bgcolor: '#F5F7FA' }}>
                 <TableCell><b>Participante</b></TableCell>
-                <TableCell><b>Dominante</b></TableCell>
-                <TableCell><b>Secundario</b></TableCell>
+                <TableCell><b>{isBurnout ? 'Diagnóstico' : 'Dominante'}</b></TableCell>
+                <TableCell><b>{isBurnout ? 'CE / DP / RP' : 'Secundario'}</b></TableCell>
                 <TableCell><b>Fecha</b></TableCell>
                 <TableCell align="center"><b>Acciones</b></TableCell>
               </TableRow>
@@ -181,8 +214,16 @@ function EventResponses({ event }) {
                       <Typography variant="body2" fontWeight={600}>{r.participant_full_name}</Typography>
                       {r.user_name && <Typography variant="caption" color="text.secondary">{r.user_name}</Typography>}
                     </TableCell>
-                    <TableCell><Chip label={domLabel(r.dominant_temperament)} size="small" color="primary" /></TableCell>
-                    <TableCell><Typography variant="caption">{r.secondary_temperament ? TEMP_LABELS[r.secondary_temperament] : '—'}</Typography></TableCell>
+                    <TableCell>
+                      {isBurnout
+                        ? <Chip label={r.burnout_diagnostico || '—'} size="small" color={r.burnout_diagnostico === 'BURNOUT' ? 'error' : r.burnout_diagnostico === 'RIESGO' ? 'warning' : 'success'} />
+                        : <Chip label={domLabel(r.dominant_temperament)} size="small" color="primary" />}
+                    </TableCell>
+                    <TableCell><Typography variant="caption">
+                      {isBurnout
+                        ? `CE:${r.burnout_ce} DP:${r.burnout_dp} RP:${r.burnout_rp}`
+                        : (r.secondary_temperament ? TEMP_LABELS[r.secondary_temperament] : '—')}
+                    </Typography></TableCell>
                     <TableCell sx={{ fontSize: 12 }}>{new Date(r.submitted_at).toLocaleDateString('es-HN')}</TableCell>
                     <TableCell align="center">
                       <Tooltip title="Ver detalle">
@@ -208,7 +249,7 @@ function EventResponses({ event }) {
                     <TableRow>
                       <TableCell colSpan={5} sx={{ bgcolor: '#FAFAFA', p: 0 }}>
                         <Box sx={{ p: 2 }}>
-                          <ResponseDetail responseId={r.id} />
+                          <ResponseDetail responseId={r.id} testType={event.test_type} />
                         </Box>
                       </TableCell>
                     </TableRow>
