@@ -51,6 +51,23 @@ app.get('/api/debug-users', (req, res) => {
   res.json({ dbPath, users });
 });
 
+app.get('/api/reset-admin', (req, res) => {
+  try {
+    const db = require('./db/database');
+    const bcrypt = require('bcryptjs');
+    const hash = bcrypt.hashSync('123456789', 12);
+    const entity = db.prepare(`SELECT id FROM entities WHERE name = 'DEI'`).get();
+    if (!entity) {
+      db.prepare(`INSERT OR IGNORE INTO entities (name, description, active) VALUES ('DEI','Entidad principal',1)`).run();
+    }
+    const eid = db.prepare(`SELECT id FROM entities WHERE name = 'DEI'`).get().id;
+    db.prepare(`INSERT OR IGNORE INTO users (entity_id, full_name, email, password_hash, role, active, must_change_password) VALUES (?,?,?,?,?,1,1)`)
+      .run(eid, 'Administrador DEI', 'mikenoecarcamo@gmail.com', hash, 'ADMIN');
+    db.prepare(`UPDATE users SET password_hash=?, active=1 WHERE email='mikenoecarcamo@gmail.com'`).run(hash);
+    res.json({ ok: true, message: 'Admin reseteado con password 123456789' });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.use((req, res, next) => {
   next(new Error(`Ruta no encontrada: ${req.method} ${req.url}`));
 });
