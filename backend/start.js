@@ -3,7 +3,7 @@ const path = require('path');
 
 const DB_PATH = process.env.DB_PATH || './data/dei.sqlite';
 const resolvedDb = path.resolve(DB_PATH);
-const seedDb = path.resolve(__dirname, 'data/seed/dei.sqlite');
+const seedDb = path.resolve(__dirname, 'seed/dei.sqlite');
 
 if (!fs.existsSync(resolvedDb) && fs.existsSync(seedDb)) {
   const dir = path.dirname(resolvedDb);
