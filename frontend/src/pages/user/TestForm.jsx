@@ -415,16 +415,20 @@ export default function TestForm() {
             </span>
           </Tooltip>
         ) : (
-          <Button
-            variant="contained"
-            color="success"
-            startIcon={<Send />}
-            onClick={handleSubmit}
-            disabled={submitting}
-            sx={{ borderRadius: 2, fontWeight: 700 }}
-          >
-            {submitting ? <CircularProgress size={20} color="inherit" /> : 'Enviar Test'}
-          </Button>
+          <Tooltip title={answered < questions.length ? `Faltan ${questions.length - answered} pregunta${questions.length - answered !== 1 ? 's' : ''} por responder` : ''} arrow>
+            <span>
+              <Button
+                variant="contained"
+                color="success"
+                startIcon={<Send />}
+                onClick={handleSubmit}
+                disabled={submitting || answered < questions.length}
+                sx={{ borderRadius: 2, fontWeight: 700 }}
+              >
+                {submitting ? <CircularProgress size={20} color="inherit" /> : 'Enviar Test'}
+              </Button>
+            </span>
+          </Tooltip>
         )}
       </Box>
     </Box>

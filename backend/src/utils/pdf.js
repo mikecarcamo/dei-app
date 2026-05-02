@@ -248,6 +248,7 @@ function generateIndividualPDF(doc, response, event, answers) {
 }
 
 function drawEventDataSection(doc, y, event, responses, headerColor) {
+  const generatedAt = new Date().toLocaleString('es-GT', { dateStyle: 'long', timeStyle: 'short' });
   doc.fontSize(13).font('Helvetica-Bold').fillColor(headerColor).text('DATOS DEL EVENTO', 40, y);
   y += 20;
   y = drawSection(doc, y, 'Evento:', event.name);
@@ -255,6 +256,7 @@ function drawEventDataSection(doc, y, event, responses, headerColor) {
   y = drawSection(doc, y, 'Test:', event.test_name || '—');
   y = drawSection(doc, y, 'Período:', `${event.start_date} al ${event.end_date}`);
   y = drawSection(doc, y, 'Total de formularios:', String(responses.length));
+  y = drawSection(doc, y, 'Fecha de generación:', generatedAt);
   y += 10;
   doc.rect(40, y, doc.page.width - 80, 1).fill(headerColor === COLORS.burnout ? COLORS.burnoutBorder : COLORS.border);
   y += 15;
@@ -376,6 +378,9 @@ function generateConsolidatedPDF(doc, event, responses, includeDetail = false, i
           .text(event.name, 40, 56, { align: 'center', width: doc.page.width - 80 });
         doc.fillColor(COLORS.text);
         let dy = 110;
+        const fechaLlenadoB = r.submitted_at ? new Date(r.submitted_at.replace(' ', 'T')).toLocaleString('es-GT', { dateStyle: 'long', timeStyle: 'short' }) : '—';
+        dy = drawSection(doc, dy, 'Fecha de llenado:', fechaLlenadoB);
+        dy += 5;
         dy = drawBurnoutBar(doc, dy, 'Cansancio Emocional:', r.burnout_ce ?? 0, 54, r.burnout_ce_nivel || 'BAJO');
         dy = drawBurnoutBar(doc, dy, 'Despersonalización:', r.burnout_dp ?? 0, 30, r.burnout_dp_nivel || 'BAJO');
         dy = drawBurnoutBar(doc, dy, 'Realización Personal:', r.burnout_rp ?? 0, 48, r.burnout_rp_nivel || 'BAJO', true);
@@ -452,6 +457,8 @@ function generateConsolidatedPDF(doc, event, responses, includeDetail = false, i
       doc.addPage();
       let dy = drawHeader(doc, r.participant_full_name, event.name);
       dy += 5;
+      const fechaLlenado = r.submitted_at ? new Date(r.submitted_at.replace(' ', 'T')).toLocaleString('es-GT', { dateStyle: 'long', timeStyle: 'short' }) : '—';
+      dy = drawSection(doc, dy, 'Fecha de llenado:', fechaLlenado);
       dy = drawSection(doc, dy, 'Temperamento Dom.:', (r.dominant_temperament || '').replace('SANGUINEO', 'Sanguíneo').replace('COLERICO', 'Colérico').replace('MELANCOLICO', 'Melancólico').replace('FLEMATICO', 'Flemático'));
       dy = drawSection(doc, dy, 'Temperamento Sec.:', (r.secondary_temperament || '').replace('SANGUINEO', 'Sanguíneo').replace('COLERICO', 'Colérico').replace('MELANCOLICO', 'Melancólico').replace('FLEMATICO', 'Flemático'));
       dy += 5;
