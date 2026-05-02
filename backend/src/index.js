@@ -54,9 +54,14 @@ app.get('/api/debug-users', (req, res) => {
 app.get('/api/restore-seed-db', (req, res) => {
   try {
     const path = require('path');
+    const fs = require('fs');
     const Database = require('better-sqlite3');
     const liveDb = require('./db/database');
-    const seedDb = new Database(path.resolve(__dirname, '../data/seed/dei.sqlite'), { readonly: true });
+    const seedPath = path.resolve(__dirname, '../data/seed/dei.sqlite');
+    const altPath = path.resolve(process.cwd(), 'data/seed/dei.sqlite');
+    const usePath = fs.existsSync(seedPath) ? seedPath : fs.existsSync(altPath) ? altPath : null;
+    if (!usePath) return res.status(404).json({ error: 'seed no encontrado', tried: [seedPath, altPath], cwd: process.cwd(), __dirname });
+    const seedDb = new Database(usePath, { readonly: true });
 
     const tables = ['entities','tests','questions','options','users','licenses','events','event_users','responses','response_answers'];
     let counts = {};
