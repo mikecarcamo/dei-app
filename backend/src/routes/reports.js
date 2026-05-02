@@ -19,12 +19,21 @@ function addPageNumbers(doc, darkPageIndexes) {
     doc.switchToPage(i);
     const label = `${i + 1}/${total}`;
     const pageW = doc.page.width;
+    doc.save();
     doc.fontSize(9).font('Helvetica-Bold');
     const textW = doc.widthOfString(label);
-    const x = pageW - 40 - textW;
-    const y = 12;
-    const color = dark.has(i) ? '#FFFFFF' : '#333333';
-    doc.fillOpacity(1).fillColor(color).text(label, x, y, { lineBreak: false });
+    const x = pageW - 45 - textW;
+    const y = 10;
+    const isDark = dark.has(i);
+    if (isDark) {
+      doc.save();
+      doc.fillOpacity(0.35).roundedRect(x - 4, y - 2, textW + 8, 16, 3).fill('#000000');
+      doc.restore();
+    }
+    doc.fillOpacity(1).fillColor(isDark ? '#FFFFFF' : '#1a1a1a')
+      .font('Helvetica-Bold').fontSize(9)
+      .text(label, x, y, { lineBreak: false });
+    doc.restore();
   }
   doc.flushPages();
 }
