@@ -6,31 +6,28 @@ const { verifyToken, requireAdmin } = require('../middleware/auth');
 const { generateIndividualPDF, generateConsolidatedPDF, appendDisclaimer, drawWatermark } = require('../utils/pdf');
 
 function createDoc() {
-  const doc = new PDFDocument({ margin: 40, size: 'A4', bufferPages: true });
+  const doc = new PDFDocument({ margin: 40, size: 'LETTER', bufferPages: true });
   drawWatermark(doc);
   doc.on('pageAdded', () => drawWatermark(doc));
   return doc;
 }
 
 function addPageNumbers(doc, darkPageIndexes) {
-  const dark = new Set(darkPageIndexes || []);
   const total = doc.bufferedPageRange().count;
   for (let i = 0; i < total; i++) {
     doc.switchToPage(i);
     const label = `${i + 1}/${total}`;
     const pageW = doc.page.width;
     doc.save();
-    doc.fontSize(9).font('Helvetica-Bold');
+    doc.font('Helvetica-Bold').fontSize(9);
     const textW = doc.widthOfString(label);
-    const x = pageW - 45 - textW;
-    const y = 10;
-    const isDark = dark.has(i);
-    if (isDark) {
-      doc.save();
-      doc.fillOpacity(0.35).roundedRect(x - 4, y - 2, textW + 8, 16, 3).fill('#000000');
-      doc.restore();
-    }
-    doc.fillOpacity(1).fillColor(isDark ? '#FFFFFF' : '#1a1a1a')
+    const x = pageW - 44 - textW;
+    const y = 8;
+    // Fondo negro semitransparente siempre visible
+    doc.fillOpacity(0.45).fillColor('#000000')
+      .roundedRect(x - 3, y - 2, textW + 6, 15, 2).fill();
+    // Texto blanco encima
+    doc.fillOpacity(1).fillColor('#FFFFFF')
       .font('Helvetica-Bold').fontSize(9)
       .text(label, x, y, { lineBreak: false });
     doc.restore();
