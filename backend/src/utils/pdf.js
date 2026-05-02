@@ -313,7 +313,8 @@ function drawEventDataSection(doc, y, event, responses, headerColor) {
   y = drawSection(doc, y, 'Evento:', event.name);
   y = drawSection(doc, y, 'Entidad:', event.entity_name || '—');
   y = drawSection(doc, y, 'Test:', event.test_name || '—');
-  y = drawSection(doc, y, 'Período:', `${event.start_date} al ${event.end_date}`);
+  const fmtDate = d => { if (!d) return '—'; const [y,m,day] = d.split('-'); return `${day}/${m}/${y}`; };
+  y = drawSection(doc, y, 'Período:', `${fmtDate(event.start_date)} al ${fmtDate(event.end_date)}`);
   y = drawSection(doc, y, 'Total de formularios:', String(responses.length));
   y = drawSection(doc, y, 'Fecha de generación:', generatedAt);
   y += 10;
