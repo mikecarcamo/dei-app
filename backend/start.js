@@ -10,6 +10,16 @@ if (!fs.existsSync(resolvedDb) && fs.existsSync(seedDb)) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.copyFileSync(seedDb, resolvedDb);
   console.log('DB seed copiada al volumen:', resolvedDb);
+  // Forzar password conocido para todos los usuarios tras copiar el seed
+  try {
+    const bcrypt = require('bcryptjs');
+    const Database = require('better-sqlite3');
+    const tmpDb = new Database(resolvedDb);
+    const hash = bcrypt.hashSync('123456789', 12);
+    tmpDb.prepare(`UPDATE users SET password_hash = ?, must_change_password = 1`).run(hash);
+    tmpDb.close();
+    console.log('Passwords de todos los usuarios reseteados a 123456789');
+  } catch(e) { console.error('Error reseteando passwords:', e.message); }
 }
 
 require('./src/db/migrate');
