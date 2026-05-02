@@ -18,6 +18,9 @@ frontend/dist/
 *.log
 npm-debug.log*
 
+# Carpeta de pruebas local
+TEST/
+
 # Sistema operativo
 .DS_Store
 Thumbs.db
