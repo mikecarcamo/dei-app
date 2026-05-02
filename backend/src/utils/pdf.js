@@ -267,7 +267,31 @@ function formatFecha(str) {
   return new Date(s).toLocaleDateString('es-GT');
 }
 
-function generateConsolidatedPDF(doc, event, responses, includeDetail = false) {
+function drawAnswersDetail(doc, ay, answers) {
+  let section = '';
+  for (const ans of answers) {
+    if (ans.section !== section) {
+      section = ans.section;
+      if (ay > doc.page.height - 100) { doc.addPage(); ay = 50; }
+      doc.fontSize(11).font('Helvetica-Bold').fillColor(COLORS.primary).text(
+        section === 'FORTALEZAS' ? 'Fortalezas (Preguntas 1-20)' : 'Debilidades (Preguntas 21-40)', 40, ay
+      );
+      ay += 18;
+    }
+    if (ay > doc.page.height - 80) { doc.addPage(); ay = 50; }
+    const bg = ans.number % 2 === 0 ? '#FAFAFA' : COLORS.white;
+    doc.rect(40, ay - 2, doc.page.width - 80, 28).fill(bg);
+    doc.fontSize(9).font('Helvetica-Bold').fillColor(COLORS.secondary).text(`${ans.number}.`, 42, ay + 2, { width: 20 });
+    const optionsText = ans.options_summary || ans.question_text;
+    doc.fontSize(9).font('Helvetica').fillColor(COLORS.text).text(optionsText, 62, ay + 2, { width: 320 });
+    const chosenText = ans.option_text || ans.selected_letter || '—';
+    doc.fontSize(9).font('Helvetica-Bold').fillColor(COLORS.primary).text(chosenText, 390, ay + 2, { width: 160 });
+    ay += 30;
+  }
+  return ay;
+}
+
+function generateConsolidatedPDF(doc, event, responses, includeDetail = false, includeAnswers = false) {
   const isBurnout = event.test_type === 'BURNOUT';
 
   if (isBurnout) {
@@ -437,6 +461,13 @@ function generateConsolidatedPDF(doc, event, responses, includeDetail = false) {
       dy += 10;
       dy = drawDisclaimer(doc, dy);
       drawSignature(doc, dy);
+
+      if (includeAnswers && r.answers && r.answers.length > 0) {
+        doc.addPage();
+        let ay = drawHeader(doc, 'Detalle de Respuestas', r.participant_full_name);
+        ay += 10;
+        drawAnswersDetail(doc, ay, r.answers);
+      }
     }
   }
 

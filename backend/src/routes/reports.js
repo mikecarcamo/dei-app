@@ -74,13 +74,37 @@ router.get('/consolidated/:eventId', verifyToken, (req, res) => {
     SELECT * FROM responses WHERE event_id = ? AND annulled = 0 ORDER BY participant_full_name COLLATE NOCASE ASC
   `).all(req.params.eventId);
 
-  const includeDetail = req.query.detail === 'true';
+  const detailParam = req.query.detail;
+  const includeDetail = detailParam === 'true' || detailParam === 'full';
+  const includeAnswers = detailParam === 'full';
+
+  let responsesWithAnswers = responses;
+  if (includeAnswers) {
+    responsesWithAnswers = responses.map(r => {
+      const rawAnswers = db.prepare(`
+        SELECT ra.*, q.number, q.text as question_text, q.section,
+               o.text as option_text, o.temperament
+        FROM response_answers ra
+        JOIN questions q ON ra.question_id = q.id
+        LEFT JOIN options o ON ra.selected_option_id = o.id
+        WHERE ra.response_id = ?
+        ORDER BY q.number
+      `).all(r.id);
+      const answers = rawAnswers.map(ans => {
+        const opts = db.prepare(`SELECT letter, text FROM options WHERE question_id = ? ORDER BY letter`).all(ans.question_id);
+        const options_summary = opts.map(o => `${o.letter.toUpperCase()}) ${o.text}`).join('   ');
+        return { ...ans, options_summary };
+      });
+      return { ...r, answers };
+    });
+  }
+
   const doc = new PDFDocument({ margin: 40, size: 'A4' });
   const safeName = (event.name || 'evento').replace(/[^a-zA-Z0-9_\-\s]/g, '').replace(/\s+/g, '_');
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="consolidado_${safeName}.pdf"`);
   doc.pipe(res);
-  generateConsolidatedPDF(doc, event, responses, includeDetail);
+  generateConsolidatedPDF(doc, event, responsesWithAnswers, includeDetail, includeAnswers);
   appendDisclaimer(doc);
   doc.end();
 });

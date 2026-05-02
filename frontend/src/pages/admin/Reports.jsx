@@ -3,7 +3,7 @@ import {
   Box, Typography, Card, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Button, Chip, CircularProgress, Alert,
   Accordion, AccordionSummary, AccordionDetails, IconButton, Tooltip,
-  Dialog, DialogTitle, DialogContent, DialogActions, FormControlLabel, Checkbox,
+  Dialog, DialogTitle, DialogContent, DialogActions,
   LinearProgress, Divider, FormControl, InputLabel, Select, MenuItem, Paper,
 } from '@mui/material';
 import {
@@ -15,14 +15,13 @@ import api from '../../api/axios';
 const TEMP_LABELS = { SANGUINEO: 'Sanguíneo', COLERICO: 'Colérico', MELANCOLICO: 'Melancólico', FLEMATICO: 'Flemático' };
 
 function ConsolidatedDialog({ open, event, onClose }) {
-  const [includeDetail, setIncludeDetail] = useState(false);
-  const [downloading, setDownloading] = useState(false);
+  const [downloading, setDownloading] = useState(null);
 
-  const handleDownload = async () => {
-    setDownloading(true);
+  const handleDownload = async (detailMode) => {
+    setDownloading(detailMode);
     try {
       const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
-      const url = `${baseURL}/reports/consolidated/${event.id}?detail=${includeDetail}`;
+      const url = `${baseURL}/reports/consolidated/${event.id}?detail=${detailMode}`;
       const token = localStorage.getItem('dei_token');
       const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
       const blob = await response.blob();
@@ -31,25 +30,32 @@ function ConsolidatedDialog({ open, event, onClose }) {
       link.download = `consolidado_${event.name.replace(/\s+/g, '_')}.pdf`;
       link.click();
     } finally {
-      setDownloading(false);
+      setDownloading(null);
     }
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>PDF Consolidado</DialogTitle>
       <DialogContent>
-        <Typography variant="body2" mb={2}>{event?.name}</Typography>
-        <FormControlLabel
-          control={<Checkbox checked={includeDetail} onChange={e => setIncludeDetail(e.target.checked)} />}
-          label="Incluir detalle completo por persona"
-        />
+        <Typography variant="body2" color="text.secondary" mb={2}>{event?.name}</Typography>
+        <Box display="flex" flexDirection="column" gap={1.5}>
+          <Button fullWidth variant="outlined" startIcon={downloading === 'false' ? <CircularProgress size={18} /> : <Download />}
+            disabled={!!downloading} onClick={() => handleDownload('false')}>
+            Resumen general (tabla de participantes)
+          </Button>
+          <Button fullWidth variant="outlined" color="secondary" startIcon={downloading === 'true' ? <CircularProgress size={18} /> : <Download />}
+            disabled={!!downloading} onClick={() => handleDownload('true')}>
+            Con conclusión por persona
+          </Button>
+          <Button fullWidth variant="contained" color="secondary" startIcon={downloading === 'full' ? <CircularProgress size={18} /> : <Download />}
+            disabled={!!downloading} onClick={() => handleDownload('full')}>
+            Con detalle de respuestas por persona
+          </Button>
+        </Box>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancelar</Button>
-        <Button variant="contained" startIcon={<Download />} onClick={handleDownload} disabled={downloading}>
-          {downloading ? <CircularProgress size={20} /> : 'Descargar PDF'}
-        </Button>
+        <Button onClick={onClose} disabled={!!downloading}>Cerrar</Button>
       </DialogActions>
     </Dialog>
   );
