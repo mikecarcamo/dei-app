@@ -18,7 +18,6 @@ const insertUser = db.prepare(`
   VALUES (?, ?, ?, ?, ?, 1, 1)
 `);
 insertUser.run(entity.id, 'Administrador DEI', 'mikenoecarcamo@gmail.com', passwordHash, 'ADMIN');
-db.prepare(`UPDATE users SET password_hash = ? WHERE email = 'mikenoecarcamo@gmail.com'`).run(passwordHash);
 const adminUser = db.prepare(`SELECT id FROM users WHERE email = 'mikenoecarcamo@gmail.com'`).get();
 console.log('Usuario admin creado/verificado, id:', adminUser.id);
 
