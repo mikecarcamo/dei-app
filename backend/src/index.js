@@ -44,6 +44,13 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', version: '1.0.0', timestamp: new Date().toISOString() });
 });
 
+app.get('/api/debug-users', (req, res) => {
+  const db = require('./db/database');
+  const users = db.prepare('SELECT id, email, active FROM users').all();
+  const dbPath = require('path').resolve(process.env.DB_PATH || './data/dei.sqlite');
+  res.json({ dbPath, users });
+});
+
 app.use((req, res, next) => {
   next(new Error(`Ruta no encontrada: ${req.method} ${req.url}`));
 });
