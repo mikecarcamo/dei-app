@@ -6,10 +6,28 @@ const { verifyToken, requireAdmin } = require('../middleware/auth');
 const { generateIndividualPDF, generateConsolidatedPDF, appendDisclaimer, drawWatermark } = require('../utils/pdf');
 
 function createDoc() {
-  const doc = new PDFDocument({ margin: 40, size: 'A4' });
+  const doc = new PDFDocument({ margin: 40, size: 'A4', bufferPages: true });
   drawWatermark(doc);
   doc.on('pageAdded', () => drawWatermark(doc));
   return doc;
+}
+
+function addPageNumbers(doc) {
+  const total = doc.bufferedPageRange().count;
+  for (let i = 0; i < total; i++) {
+    doc.switchToPage(i);
+    const label = `${String(i + 1).padStart(3, '0')} de ${String(total).padStart(3, '0')}`;
+    const pageW = doc.page.width;
+    doc.fontSize(8).font('Helvetica');
+    const textW = doc.widthOfString(label);
+    const x = pageW - 44 - textW;
+    const y = 9;
+    doc.save();
+    doc.fillOpacity(0.35).roundedRect(x - 4, y - 2, textW + 10, 14, 3).fill('#000000');
+    doc.restore();
+    doc.fillOpacity(1).fillColor('#FFFFFF').text(label, x, y, { lineBreak: false });
+  }
+  doc.flushPages();
 }
 
 router.get('/individual/:responseId', verifyToken, (req, res) => {
@@ -55,6 +73,7 @@ router.get('/individual/:responseId', verifyToken, (req, res) => {
   doc.pipe(res);
   generateIndividualPDF(doc, response, event, answers);
   appendDisclaimer(doc);
+  addPageNumbers(doc);
   doc.end();
 });
 
@@ -113,6 +132,7 @@ router.get('/consolidated/:eventId', verifyToken, (req, res) => {
   doc.pipe(res);
   generateConsolidatedPDF(doc, event, responsesWithAnswers, includeDetail, includeAnswers);
   appendDisclaimer(doc);
+  addPageNumbers(doc);
   doc.end();
 });
 
