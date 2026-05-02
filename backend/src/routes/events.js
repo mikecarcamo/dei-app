@@ -25,7 +25,7 @@ function getEventFull(id) {
 
 router.get('/', verifyToken, requireAdmin, (req, res) => {
   const events = db.prepare(`
-    SELECT ev.*, e.name as entity_name, t.name as test_name,
+    SELECT ev.*, e.name as entity_name, t.name as test_name, t.test_type,
            lk.key_value, lk.status as license_status
     FROM events ev
     LEFT JOIN entities e ON ev.entity_id = e.id
