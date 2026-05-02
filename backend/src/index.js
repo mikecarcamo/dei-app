@@ -51,6 +51,19 @@ app.get('/api/debug-users', (req, res) => {
   res.json({ dbPath, users });
 });
 
+app.get('/api/replace-db', (req, res) => {
+  try {
+    const path = require('path');
+    const fs = require('fs');
+    const seedPath = '/app/seed/dei.sqlite';
+    const dbPath = path.resolve(process.env.DB_PATH || './data/dei.sqlite');
+    if (!fs.existsSync(seedPath)) return res.status(404).json({ error: 'seed no encontrado en ' + seedPath });
+    fs.copyFileSync(seedPath, dbPath);
+    res.json({ ok: true, message: 'BD reemplazada. El servidor debe reiniciarse para aplicar.', from: seedPath, to: dbPath });
+    setTimeout(() => process.exit(0), 500);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/restore-seed-db', (req, res) => {
   try {
     const path = require('path');
