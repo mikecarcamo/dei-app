@@ -25,7 +25,7 @@ router.get('/individual/:responseId', verifyToken, (req, res) => {
     WHERE ev.id = ?
   `).get(response.event_id);
 
-  const answers = db.prepare(`
+  const rawAnswers = db.prepare(`
     SELECT ra.*, q.number, q.text as question_text, q.section,
            o.text as option_text, o.temperament
     FROM response_answers ra
@@ -34,6 +34,12 @@ router.get('/individual/:responseId', verifyToken, (req, res) => {
     WHERE ra.response_id = ?
     ORDER BY q.number
   `).all(response.id);
+
+  const answers = rawAnswers.map(ans => {
+    const opts = db.prepare(`SELECT letter, text FROM options WHERE question_id = ? ORDER BY letter`).all(ans.question_id);
+    const summary = opts.map(o => `${o.letter.toUpperCase()}) ${o.text}`).join('   ');
+    return { ...ans, options_summary: summary };
+  });
 
   const doc = new PDFDocument({ margin: 40, size: 'A4' });
   const safeName = (response.participant_full_name || 'resultado').replace(/[^a-zA-Z0-9_\-\s]/g, '').replace(/\s+/g, '_');

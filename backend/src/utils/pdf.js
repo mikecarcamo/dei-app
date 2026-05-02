@@ -237,9 +237,10 @@ function generateIndividualPDF(doc, response, event, answers) {
       const bg = ans.number % 2 === 0 ? '#FAFAFA' : COLORS.white;
       doc.rect(40, ay - 2, doc.page.width - 80, 28).fill(bg);
       doc.fontSize(9).font('Helvetica-Bold').fillColor(COLORS.secondary).text(`${ans.number}.`, 42, ay + 2, { width: 20 });
-      doc.fontSize(9).font('Helvetica').fillColor(COLORS.text).text(ans.question_text, 62, ay + 2, { width: 340 });
-      const optLabel = { a: 'A - Sanguíneo', b: 'B - Colérico', c: 'C - Melancólico', d: 'D - Flemático' }[ans.selected_letter] || ans.selected_letter;
-      doc.fontSize(9).font('Helvetica-Bold').fillColor(COLORS.primary).text(optLabel, 410, ay + 2, { width: 140 });
+      const optionsText = ans.options_summary || ans.question_text;
+      doc.fontSize(9).font('Helvetica').fillColor(COLORS.text).text(optionsText, 62, ay + 2, { width: 320 });
+      const chosenText = ans.option_text || ans.selected_letter || '—';
+      doc.fontSize(9).font('Helvetica-Bold').fillColor(COLORS.primary).text(chosenText, 390, ay + 2, { width: 160 });
       ay += 30;
     }
   }
