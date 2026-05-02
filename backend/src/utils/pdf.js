@@ -294,8 +294,10 @@ function generateIndividualPDF(doc, response, event, answers) {
 
       if (ay > doc.page.height - 80) { doc.addPage(); ay = 50; }
 
-      const bg = ans.number % 2 === 0 ? '#FAFAFA' : COLORS.white;
-      doc.rect(40, ay - 2, doc.page.width - 80, 28).fill(bg);
+      const bg = ans.number % 2 === 0 ? '#FFF3E0' : COLORS.white;
+      doc.save();
+      doc.fillOpacity(0.5).rect(40, ay - 2, doc.page.width - 80, 28).fill(bg);
+      doc.restore();
       doc.fontSize(9).font('Helvetica-Bold').fillColor(COLORS.secondary).text(`${ans.number}.`, 42, ay + 2, { width: 20 });
       const optionsText = ans.options_summary || ans.question_text;
       doc.fontSize(9).font('Helvetica').fillColor(COLORS.text).text(optionsText, 62, ay + 2, { width: 320 });
@@ -413,7 +415,9 @@ function generateConsolidatedPDF(doc, event, responses, includeDetail = false, i
       const r = responses[i];
       if (y > doc.page.height - 80) { doc.addPage(); y = 50; }
       const bg = i % 2 === 0 ? COLORS.burnoutAccent : COLORS.white;
-      doc.rect(40, y, doc.page.width - 80, 18).fill(bg);
+      doc.save();
+      doc.fillOpacity(0.5).rect(40, y, doc.page.width - 80, 18).fill(bg);
+      doc.restore();
       doc.fillColor(COLORS.text).fontSize(8).font('Helvetica');
       const nivelColor = (n, risk) => n === risk ? COLORS.nivelAlto : n === 'MEDIO' ? COLORS.nivelMedio : COLORS.nivelBajo;
       doc.text(String(i + 1), colX[0], y + 4, { width: colW[0] });
@@ -515,7 +519,9 @@ function generateConsolidatedPDF(doc, event, responses, includeDetail = false, i
     const r = responses[i];
     if (y > doc.page.height - 80) { doc.addPage(); y = 50; }
     const bg = i % 2 === 0 ? COLORS.accent : COLORS.white;
-    doc.rect(40, y, doc.page.width - 80, 18).fill(bg);
+    doc.save();
+    doc.fillOpacity(0.5).rect(40, y, doc.page.width - 80, 18).fill(bg);
+    doc.restore();
     doc.fillColor(COLORS.text).fontSize(8).font('Helvetica');
     const domLabel = (r.dominant_temperament || '—').replace('SANGUINEO', 'Sanguíneo').replace('COLERICO', 'Colérico').replace('MELANCOLICO', 'Melancólico').replace('FLEMATICO', 'Flemático');
     const secLabel = (r.secondary_temperament || '—').replace('SANGUINEO', 'Sanguíneo').replace('COLERICO', 'Colérico').replace('MELANCOLICO', 'Melancólico').replace('FLEMATICO', 'Flemático');
