@@ -57,7 +57,7 @@ router.get('/consolidated/:eventId', verifyToken, requireAdmin, (req, res) => {
   if (!event) return res.status(404).json({ message: 'Evento no encontrado' });
 
   const responses = db.prepare(`
-    SELECT * FROM responses WHERE event_id = ? AND annulled = 0 ORDER BY submitted_at
+    SELECT * FROM responses WHERE event_id = ? AND annulled = 0 ORDER BY participant_full_name COLLATE NOCASE ASC
   `).all(req.params.eventId);
 
   const includeDetail = req.query.detail === 'true';
