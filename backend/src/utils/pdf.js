@@ -129,7 +129,35 @@ function drawBurnoutBar(doc, y, label, score, max, nivel, invertColors = false) 
   return y + 22;
 }
 
-function generateBurnoutPDF(doc, response, event) {
+function drawBurnoutAnswersDetail(doc, y, answers) {
+  const FREQ_LABELS = ['Nunca', 'Pocas veces al año', '1 vez al mes', 'Pocas veces al mes', '1 vez a la semana', 'Pocas veces a la semana', 'Todos los días'];
+  const SUBESCALA_LABELS = { CE: 'Cansancio Emocional', DP: 'Despersonalización', RP: 'Realización Personal' };
+  const SUBESCALA_COLORS = { CE: COLORS.burnout, DP: COLORS.warning, RP: COLORS.success };
+  let currentSub = '';
+  for (const ans of answers) {
+    const sub = ans.section || '';
+    if (sub !== currentSub) {
+      currentSub = sub;
+      if (y > doc.page.height - 100) { doc.addPage(); markDarkPage(doc); y = 50; }
+      doc.rect(40, y, doc.page.width - 80, 20).fill(SUBESCALA_COLORS[sub] || COLORS.burnout);
+      doc.fontSize(10).font('Helvetica-Bold').fillColor(COLORS.white)
+        .text(SUBESCALA_LABELS[sub] || sub, 45, y + 5, { width: doc.page.width - 90 });
+      y += 24;
+    }
+    if (y > doc.page.height - 60) { doc.addPage(); y = 50; }
+    const bg = ans.number % 2 === 0 ? '#FBE9E7' : COLORS.white;
+    doc.rect(40, y - 2, doc.page.width - 80, 22).fill(bg);
+    doc.fontSize(9).font('Helvetica-Bold').fillColor(COLORS.burnout).text(`${ans.number}.`, 42, y + 2, { width: 20 });
+    doc.fontSize(9).font('Helvetica').fillColor(COLORS.text).text(ans.question_text || '—', 62, y + 2, { width: 350 });
+    const val = ans.numeric_value ?? 0;
+    const freqLabel = `${val} — ${FREQ_LABELS[val] || ''}` ;
+    doc.fontSize(9).font('Helvetica-Bold').fillColor(COLORS.burnout).text(freqLabel, 420, y + 2, { width: 130 });
+    y += 24;
+  }
+  return y;
+}
+
+function generateBurnoutPDF(doc, response, event, answers) {
   const entityName = event.entity_name || '—';
   const submittedStr = response.submitted_at ? response.submitted_at.replace(' ', 'T') : null;
   const submittedAt = submittedStr ? new Date(submittedStr).toLocaleString('es-GT', { dateStyle: 'long', timeStyle: 'short' }) : '—';
@@ -181,11 +209,18 @@ function generateBurnoutPDF(doc, response, event) {
   y += 10;
   y = drawDisclaimer(doc, y);
   drawSignature(doc, y);
+
+  if (answers && answers.length > 0) {
+    doc.addPage();
+    let ay = drawHeader(doc, 'Detalle de Respuestas', response.participant_full_name);
+    ay += 10;
+    drawBurnoutAnswersDetail(doc, ay, answers);
+  }
 }
 
 function generateIndividualPDF(doc, response, event, answers) {
   if (event.test_type === 'BURNOUT') {
-    return generateBurnoutPDF(doc, response, event);
+    return generateBurnoutPDF(doc, response, event, answers);
   }
 
   const entityName = event.entity_name || '—';
@@ -413,6 +448,13 @@ function generateConsolidatedPDF(doc, event, responses, includeDetail = false, i
         dy += 10;
         dy = drawDisclaimer(doc, dy);
         drawSignature(doc, dy);
+
+        if (includeAnswers && r.answers && r.answers.length > 0) {
+          doc.addPage();
+          let ay = drawHeader(doc, 'Detalle de Respuestas', r.participant_full_name);
+          ay += 10;
+          drawBurnoutAnswersDetail(doc, ay, r.answers);
+        }
       }
     }
 
