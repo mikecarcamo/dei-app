@@ -90,10 +90,11 @@ function drawSection(doc, y, label, value, labelWidth = 140) {
 
 function drawBox(doc, y, content, bgColor = COLORS.accent, borderColor = COLORS.border) {
   const boxWidth = doc.page.width - 80;
-  const textHeight = doc.heightOfString(content, { width: boxWidth - 20, fontSize: 10 });
-  const boxHeight = textHeight + 24;
+  doc.fontSize(10).font('Helvetica');
+  const textHeight = doc.heightOfString(content, { width: boxWidth - 20 });
+  const boxHeight = textHeight + 16;
   doc.rect(40, y, boxWidth, boxHeight).fill(bgColor).stroke(borderColor);
-  doc.fillColor(COLORS.text).fontSize(10).font('Helvetica').text(content, 50, y + 12, { width: boxWidth - 20 });
+  doc.fillColor(COLORS.text).fontSize(10).font('Helvetica').text(content, 50, y + 8, { width: boxWidth - 20 });
   return y + boxHeight + 10;
 }
 
