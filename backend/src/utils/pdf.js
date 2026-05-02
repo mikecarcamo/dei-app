@@ -66,7 +66,14 @@ function appendDisclaimer(doc) {
     .text(FOOTER_TEXT, 40, null, { align: 'center', width: doc.page.width - 80 });
 }
 
+function markDarkPage(doc) {
+  if (!doc._darkPages) doc._darkPages = [];
+  const idx = doc.bufferedPageRange ? doc.bufferedPageRange().start + doc.bufferedPageRange().count - 1 : 0;
+  doc._darkPages.push(idx);
+}
+
 function drawHeader(doc, title, subtitle) {
+  markDarkPage(doc);
   doc.rect(0, 0, doc.page.width, 90).fill(COLORS.primary);
   doc.fillColor(COLORS.white).fontSize(22).font('Helvetica-Bold').text(title, 40, 25, { align: 'center' });
   if (subtitle) {
@@ -127,6 +134,7 @@ function generateBurnoutPDF(doc, response, event) {
   const submittedStr = response.submitted_at ? response.submitted_at.replace(' ', 'T') : null;
   const submittedAt = submittedStr ? new Date(submittedStr).toLocaleString('es-GT', { dateStyle: 'long', timeStyle: 'short' }) : '—';
 
+  markDarkPage(doc);
   doc.rect(0, 0, doc.page.width, 90).fill(COLORS.burnout);
   doc.fillColor(COLORS.white).fontSize(20).font('Helvetica-Bold').text('Cuestionario Burnout (MBI) - Resultado Individual', 40, 22, { align: 'center' });
   doc.fontSize(11).font('Helvetica').text('Sistema de Evaluación DEI', 40, 56, { align: 'center', width: doc.page.width - 80 });
@@ -309,6 +317,7 @@ function generateConsolidatedPDF(doc, event, responses, includeDetail = false, i
   const isBurnout = event.test_type === 'BURNOUT';
 
   if (isBurnout) {
+    markDarkPage(doc);
     doc.rect(0, 0, doc.page.width, 90).fill(COLORS.burnout);
     doc.fillColor(COLORS.white).fontSize(20).font('Helvetica-Bold')
       .text('Reporte Consolidado - Burnout (MBI)', 40, 22, { align: 'center' });
@@ -383,6 +392,7 @@ function generateConsolidatedPDF(doc, event, responses, includeDetail = false, i
     if (includeDetail && responses.length > 0) {
       for (const r of responses) {
         doc.addPage();
+        markDarkPage(doc);
         doc.rect(0, 0, doc.page.width, 90).fill(COLORS.burnout);
         doc.fillColor(COLORS.white).fontSize(18).font('Helvetica-Bold')
           .text(r.participant_full_name, 40, 25, { align: 'center' });

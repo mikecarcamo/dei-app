@@ -12,20 +12,19 @@ function createDoc() {
   return doc;
 }
 
-function addPageNumbers(doc) {
+function addPageNumbers(doc, darkPageIndexes) {
+  const dark = new Set(darkPageIndexes || []);
   const total = doc.bufferedPageRange().count;
   for (let i = 0; i < total; i++) {
     doc.switchToPage(i);
-    const label = `${String(i + 1).padStart(3, '0')} de ${String(total).padStart(3, '0')}`;
+    const label = `${i + 1}/${total}`;
     const pageW = doc.page.width;
-    doc.fontSize(8).font('Helvetica');
+    doc.fontSize(9).font('Helvetica-Bold');
     const textW = doc.widthOfString(label);
-    const x = pageW - 44 - textW;
-    const y = 9;
-    doc.save();
-    doc.fillOpacity(0.35).roundedRect(x - 4, y - 2, textW + 10, 14, 3).fill('#000000');
-    doc.restore();
-    doc.fillOpacity(1).fillColor('#FFFFFF').text(label, x, y, { lineBreak: false });
+    const x = pageW - 40 - textW;
+    const y = 12;
+    const color = dark.has(i) ? '#FFFFFF' : '#333333';
+    doc.fillOpacity(1).fillColor(color).text(label, x, y, { lineBreak: false });
   }
   doc.flushPages();
 }
@@ -73,7 +72,7 @@ router.get('/individual/:responseId', verifyToken, (req, res) => {
   doc.pipe(res);
   generateIndividualPDF(doc, response, event, answers);
   appendDisclaimer(doc);
-  addPageNumbers(doc);
+  addPageNumbers(doc, doc._darkPages);
   doc.end();
 });
 
@@ -132,7 +131,7 @@ router.get('/consolidated/:eventId', verifyToken, (req, res) => {
   doc.pipe(res);
   generateConsolidatedPDF(doc, event, responsesWithAnswers, includeDetail, includeAnswers);
   appendDisclaimer(doc);
-  addPageNumbers(doc);
+  addPageNumbers(doc, doc._darkPages);
   doc.end();
 });
 
