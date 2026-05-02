@@ -51,7 +51,11 @@ router.get('/individual/:responseId', verifyToken, (req, res) => {
   doc.end();
 });
 
-router.get('/consolidated/:eventId', verifyToken, requireAdmin, (req, res) => {
+router.get('/consolidated/:eventId', verifyToken, (req, res) => {
+  if (req.user.role !== 'ADMIN' && req.user.role !== 'EMPRESA') {
+    return res.status(403).json({ message: 'Sin acceso' });
+  }
+
   const event = db.prepare(`
     SELECT ev.*, e.name as entity_name, t.name as test_name, t.test_type
     FROM events ev
@@ -61,6 +65,10 @@ router.get('/consolidated/:eventId', verifyToken, requireAdmin, (req, res) => {
   `).get(req.params.eventId);
 
   if (!event) return res.status(404).json({ message: 'Evento no encontrado' });
+
+  if (req.user.role === 'EMPRESA' && event.entity_id !== req.user.entity_id) {
+    return res.status(403).json({ message: 'Sin acceso a este evento' });
+  }
 
   const responses = db.prepare(`
     SELECT * FROM responses WHERE event_id = ? AND annulled = 0 ORDER BY participant_full_name COLLATE NOCASE ASC

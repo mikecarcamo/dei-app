@@ -6,8 +6,11 @@ import {
 } from '@mui/material';
 import {
   Event, ExpandMore, ExpandLess, Person, EmojiPeople,
-  ArrowBack, CalendarMonth, PictureAsPdf,
+  ArrowBack, CalendarMonth, PictureAsPdf, Download,
 } from '@mui/icons-material';
+import {
+  Dialog, DialogTitle, DialogContent, DialogActions, FormControlLabel, Checkbox,
+} from '@mui/material';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 
@@ -22,6 +25,47 @@ function formatLocalDate(str) {
 }
 const TEMP_COLORS = { SANGUINEO: '#42A5F5', COLERICO: '#EF5350', MELANCOLICO: '#7E57C2', FLEMATICO: '#66BB6A' };
 const NIVEL_COLOR = { BAJO: '#66BB6A', MEDIO: '#FFA726', ALTO: '#EF5350' };
+
+function ConsolidatedDialog({ open, event, onClose }) {
+  const [includeDetail, setIncludeDetail] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+      const url = `${baseURL}/reports/consolidated/${event.id}?detail=${includeDetail}`;
+      const token = localStorage.getItem('dei_token');
+      const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      const blob = await response.blob();
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `consolidado_${(event.name || 'evento').replace(/\s+/g, '_')}.pdf`;
+      link.click();
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+      <DialogTitle>PDF Consolidado</DialogTitle>
+      <DialogContent>
+        <Typography variant="body2" mb={2}>{event?.name}</Typography>
+        <FormControlLabel
+          control={<Checkbox checked={includeDetail} onChange={e => setIncludeDetail(e.target.checked)} />}
+          label="Incluir detalle completo por persona"
+        />
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancelar</Button>
+        <Button variant="contained" startIcon={<Download />} onClick={handleDownload} disabled={downloading} color="secondary">
+          {downloading ? <CircularProgress size={20} /> : 'Descargar PDF'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
 
 async function downloadPdf(responseId, name) {
   const { default: apiFn } = await import('../../api/axios');
@@ -154,6 +198,7 @@ export default function MyResults() {
   };
 
   const isEmpresa = user?.role === 'EMPRESA';
+  const [consolidatedEvent, setConsolidatedEvent] = useState(null);
 
   if (loading) return <Box display="flex" justifyContent="center" mt={6}><CircularProgress /></Box>;
 
@@ -208,6 +253,14 @@ export default function MyResults() {
                     <Typography variant="subtitle2" color="text.secondary" mb={1.5}>
                       {results.length} participante{results.length !== 1 ? 's' : ''}
                     </Typography>
+                    {isEmpresa && (
+                      <Box display="flex" justifyContent="flex-end" mb={1.5}>
+                        <Button size="small" variant="contained" color="secondary" startIcon={<PictureAsPdf />}
+                          onClick={() => setConsolidatedEvent(selectedEvent)}>
+                          PDF Consolidado
+                        </Button>
+                      </Box>
+                    )}
                     {results.map(r => <ResultCard key={r.id} result={r} testType={selectedEvent?.test_type} />)}
                   </>
                 )}
@@ -215,6 +268,9 @@ export default function MyResults() {
             </Collapse>
           </Card>
         ))
+      )}
+      {consolidatedEvent && (
+        <ConsolidatedDialog open={!!consolidatedEvent} event={consolidatedEvent} onClose={() => setConsolidatedEvent(null)} />
       )}
     </Box>
   );
