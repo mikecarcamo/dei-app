@@ -74,7 +74,8 @@ router.get('/individual/:responseId', verifyToken, (req, res) => {
   const doc = createDoc();
   const safeName = (response.participant_full_name || 'resultado').replace(/[^a-zA-Z0-9_\-\s]/g, '').replace(/\s+/g, '_');
   res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename="resultado_${safeName}.pdf"`);
+  const viewMode = req.query.view === 'true';
+  res.setHeader('Content-Disposition', `${viewMode ? 'inline' : 'attachment'}; filename="resultado_${safeName}.pdf"`);
   doc.pipe(res);
   generateIndividualPDF(doc, response, event, answers);
   appendDisclaimer(doc);
@@ -133,7 +134,8 @@ router.get('/consolidated/:eventId', verifyToken, (req, res) => {
   const doc = createDoc();
   const safeName = (event.name || 'evento').replace(/[^a-zA-Z0-9_\-\s]/g, '').replace(/\s+/g, '_');
   res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename="consolidado_${safeName}.pdf"`);
+  const viewMode = req.query.view === 'true';
+  res.setHeader('Content-Disposition', `${viewMode ? 'inline' : 'attachment'}; filename="consolidado_${safeName}.pdf"`);
   doc.pipe(res);
   generateConsolidatedPDF(doc, event, responsesWithAnswers, includeDetail, includeAnswers);
   appendDisclaimer(doc);

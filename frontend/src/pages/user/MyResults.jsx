@@ -13,6 +13,7 @@ import {
 } from '@mui/material';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
+import PdfViewerModal, { openOrDownloadPdf } from '../../components/PdfViewerModal';
 
 const TEMP_LABELS = { SANGUINEO: 'Sanguíneo', COLERICO: 'Colérico', MELANCOLICO: 'Melancólico', FLEMATICO: 'Flemático' };
 
@@ -73,18 +74,7 @@ function ConsolidatedDialog({ open, event, onClose }) {
   );
 }
 
-async function downloadPdf(responseId, name) {
-  const { default: apiFn } = await import('../../api/axios');
-  const res = await apiFn.get(`/reports/individual/${responseId}`, { responseType: 'blob' });
-  const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `resultado_${(name || 'resultado').replace(/\s+/g, '_')}.pdf`;
-  a.click();
-  window.URL.revokeObjectURL(url);
-}
-
-function ResultCard({ result, testType }) {
+function ResultCard({ result, testType, onViewPdf }) {
   const isBurnout = testType === 'BURNOUT';
   const total = result.score_a + result.score_b + result.score_c + result.score_d;
   const domLabel = (result.dominant_temperament || '').replace('SANGUINEO', 'Sanguíneo').replace('COLERICO', 'Colérico').replace('MELANCOLICO', 'Melancólico').replace('FLEMATICO', 'Flemático');
@@ -153,9 +143,9 @@ function ResultCard({ result, testType }) {
       )}
 
       <Box mt={1.5} display="flex" justifyContent="flex-end">
-        <Tooltip title="Descargar PDF Individual">
+        <Tooltip title="Ver/Descargar PDF Individual">
           <Button size="small" variant="outlined" startIcon={<PictureAsPdf />}
-            onClick={() => downloadPdf(result.id, result.participant_full_name)}
+            onClick={() => onViewPdf(result.id, result.participant_full_name)}
             sx={{ borderRadius: 2, fontSize: 12, borderColor: isBurnout ? '#BF360C' : undefined, color: isBurnout ? '#BF360C' : undefined }}
           >
             PDF
@@ -205,6 +195,15 @@ export default function MyResults() {
 
   const isEmpresa = user?.role === 'EMPRESA';
   const [consolidatedEvent, setConsolidatedEvent] = useState(null);
+  const [pdfViewer, setPdfViewer] = useState(null);
+
+  const handleViewPdf = async (responseId, name) => {
+    const token = localStorage.getItem('dei_token');
+    const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+    const url = `${baseURL}/reports/individual/${responseId}`;
+    const viewUrl = await openOrDownloadPdf({ url, filename: `resultado_${name.replace(/\s+/g,'_')}.pdf`, token });
+    if (viewUrl) setPdfViewer({ url, title: `Resultado: ${name}`, filename: `resultado_${name.replace(/\s+/g,'_')}.pdf`, token });
+  };
 
   if (loading) return <Box display="flex" justifyContent="center" mt={6}><CircularProgress /></Box>;
 
@@ -267,7 +266,7 @@ export default function MyResults() {
                         </Button>
                       </Box>
                     )}
-                    {results.map(r => <ResultCard key={r.id} result={r} testType={selectedEvent?.test_type} />)}
+                    {results.map(r => <ResultCard key={r.id} result={r} testType={selectedEvent?.test_type} onViewPdf={handleViewPdf} />)}
                   </>
                 )}
               </Box>
@@ -277,6 +276,10 @@ export default function MyResults() {
       )}
       {consolidatedEvent && (
         <ConsolidatedDialog open={!!consolidatedEvent} event={consolidatedEvent} onClose={() => setConsolidatedEvent(null)} />
+      )}
+      {pdfViewer && (
+        <PdfViewerModal open={!!pdfViewer} url={pdfViewer.url} title={pdfViewer.title}
+          token={pdfViewer.token} filename={pdfViewer.filename} onClose={() => setPdfViewer(null)} />
       )}
     </Box>
   );

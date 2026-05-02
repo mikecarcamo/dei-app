@@ -11,45 +11,44 @@ import {
   Download, Visibility, FilterList,
 } from '@mui/icons-material';
 import api from '../../api/axios';
+import PdfViewerModal, { isMobile, openOrDownloadPdf } from '../../components/PdfViewerModal';
 
 const TEMP_LABELS = { SANGUINEO: 'Sanguíneo', COLERICO: 'Colérico', MELANCOLICO: 'Melancólico', FLEMATICO: 'Flemático' };
 
 function ConsolidatedDialog({ open, event, onClose }) {
   const [downloading, setDownloading] = useState(null);
+  const [pdfViewer, setPdfViewer] = useState(null);
 
-  const handleDownload = async (detailMode) => {
+  const handleOpen = async (detailMode) => {
     setDownloading(detailMode);
     try {
       const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
       const url = `${baseURL}/reports/consolidated/${event.id}?detail=${detailMode}`;
       const token = localStorage.getItem('dei_token');
-      const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-      const blob = await response.blob();
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `consolidado_${event.name.replace(/\s+/g, '_')}.pdf`;
-      link.click();
+      const viewUrl = await openOrDownloadPdf({ url, filename: `consolidado_${(event.name||'evento').replace(/\s+/g,'_')}.pdf`, token });
+      if (viewUrl) setPdfViewer({ url, title: `Consolidado: ${event.name}`, filename: `consolidado_${(event.name||'evento').replace(/\s+/g,'_')}.pdf`, token });
     } finally {
       setDownloading(null);
     }
   };
 
   return (
+    <>
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>PDF Consolidado</DialogTitle>
       <DialogContent>
         <Typography variant="body2" color="text.secondary" mb={2}>{event?.name}</Typography>
         <Box display="flex" flexDirection="column" gap={1.5}>
           <Button fullWidth variant="outlined" startIcon={downloading === 'false' ? <CircularProgress size={18} /> : <Download />}
-            disabled={!!downloading} onClick={() => handleDownload('false')}>
+            disabled={!!downloading} onClick={() => handleOpen('false')}>
             Resumen general (tabla de participantes)
           </Button>
           <Button fullWidth variant="outlined" color="secondary" startIcon={downloading === 'true' ? <CircularProgress size={18} /> : <Download />}
-            disabled={!!downloading} onClick={() => handleDownload('true')}>
+            disabled={!!downloading} onClick={() => handleOpen('true')}>
             Con conclusión por persona
           </Button>
           <Button fullWidth variant="contained" color="secondary" startIcon={downloading === 'full' ? <CircularProgress size={18} /> : <Download />}
-            disabled={!!downloading} onClick={() => handleDownload('full')}>
+            disabled={!!downloading} onClick={() => handleOpen('full')}>
             Con detalle de respuestas por persona
           </Button>
         </Box>
@@ -58,6 +57,11 @@ function ConsolidatedDialog({ open, event, onClose }) {
         <Button onClick={onClose} disabled={!!downloading}>Cerrar</Button>
       </DialogActions>
     </Dialog>
+    {pdfViewer && (
+      <PdfViewerModal open={!!pdfViewer} url={pdfViewer.url} title={pdfViewer.title}
+        token={pdfViewer.token} filename={pdfViewer.filename} onClose={() => setPdfViewer(null)} />
+    )}
+    </>
   );
 }
 
@@ -165,17 +169,14 @@ function EventResponses({ event }) {
     }
   };
 
+  const [pdfViewer, setPdfViewer] = useState(null);
+
   const handleDownloadIndividual = async (responseId, name) => {
     const token = localStorage.getItem('dei_token');
     const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
-    const response = await fetch(`${baseURL}/reports/individual/${responseId}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    const blob = await response.blob();
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `resultado_${name.replace(/\s+/g, '_')}.pdf`;
-    link.click();
+    const url = `${baseURL}/reports/individual/${responseId}`;
+    const viewUrl = await openOrDownloadPdf({ url, filename: `resultado_${name.replace(/\s+/g,'_')}.pdf`, token });
+    if (viewUrl) setPdfViewer({ url, title: `Resultado: ${name}`, filename: `resultado_${name.replace(/\s+/g,'_')}.pdf`, token });
   };
 
   const domLabel = (t) => (t || '').replace('SANGUINEO', 'Sanguíneo').replace('COLERICO', 'Colérico').replace('MELANCOLICO', 'Melancólico').replace('FLEMATICO', 'Flemático');
@@ -268,6 +269,10 @@ function EventResponses({ event }) {
       )}
 
       <ConsolidatedDialog open={consolidatedOpen} event={event} onClose={() => setConsolidatedOpen(false)} />
+      {pdfViewer && (
+        <PdfViewerModal open={!!pdfViewer} url={pdfViewer.url} title={pdfViewer.title}
+          token={pdfViewer.token} filename={pdfViewer.filename} onClose={() => setPdfViewer(null)} />
+      )}
     </Box>
   );
 }
