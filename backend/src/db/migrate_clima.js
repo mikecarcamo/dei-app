@@ -11,7 +11,12 @@ if (!ecols.includes('target_audience')) {
 }
 if (!ecols.includes('price_per_code')) {
   db.exec(`ALTER TABLE events ADD COLUMN price_per_code REAL NOT NULL DEFAULT 0`);
-  console.log('Columna price_per_code agregada a events');
+  db.exec(`ALTER TABLE events ADD COLUMN event_amount REAL NOT NULL DEFAULT 0`);
+  console.log('Columnas price_per_code y event_amount agregadas a events');
+}
+if (!db.pragma('table_info(events)').map(c => c.name).includes('event_amount')) {
+  db.exec(`ALTER TABLE events ADD COLUMN event_amount REAL NOT NULL DEFAULT 0`);
+  console.log('Columna event_amount agregada a events');
 }
 
 db.exec(`

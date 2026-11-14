@@ -82,7 +82,7 @@ router.post('/', verifyToken, requireAdmin, [
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-  const { entity_id, test_id, name, active, license_key_id, target_audience, codes_count, price_per_code } = req.body;
+  const { entity_id, test_id, name, active, license_key_id, target_audience, codes_count, price_per_code, event_amount } = req.body;
 
   const key = db.prepare(`SELECT * FROM license_keys WHERE id = ?`).get(license_key_id);
   if (!key) return res.status(400).json({ message: 'Licencia no encontrada' });
@@ -101,13 +101,14 @@ router.post('/', verifyToken, requireAdmin, [
     }
   }
 
-  const pricePerCode = Math.max(0, parseFloat(price_per_code) || 0);
+  const pricePerCode = isClima ? Math.max(0, parseFloat(price_per_code) || 0) : 0;
+  const eventAmount = isClima ? 0 : Math.max(0, parseFloat(event_amount) || 0);
 
   const result = db.prepare(`
-    INSERT INTO events (entity_id, test_id, name, start_date, end_date, active, license_key_id, target_audience, codes_count, price_per_code)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO events (entity_id, test_id, name, start_date, end_date, active, license_key_id, target_audience, codes_count, price_per_code, event_amount)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(entity_id, test_id, name.trim(), key.valid_from, key.valid_to, active !== false ? 1 : 0, license_key_id,
-    isClima ? target_audience.trim() : null, isClima ? codes_count : 0, pricePerCode);
+    isClima ? target_audience.trim() : null, isClima ? codes_count : 0, pricePerCode, eventAmount);
 
   db.prepare(`UPDATE license_keys SET event_id = ? WHERE id = ?`).run(result.lastInsertRowid, license_key_id);
   if (isClima) createCodes(result.lastInsertRowid, codes_count);
@@ -119,7 +120,7 @@ router.put('/:id', verifyToken, requireAdmin, (req, res) => {
   const event = db.prepare(`SELECT * FROM events WHERE id = ?`).get(req.params.id);
   if (!event) return res.status(404).json({ message: 'Evento no encontrado' });
 
-  const { name, active, license_key_id, target_audience, price_per_code } = req.body;
+  const { name, active, license_key_id, target_audience, price_per_code, event_amount } = req.body;
 
   let newKey = null;
   if (license_key_id && license_key_id !== event.license_key_id) {
@@ -144,7 +145,7 @@ router.put('/:id', verifyToken, requireAdmin, (req, res) => {
 
   db.prepare(`
     UPDATE events SET name = ?, start_date = ?, end_date = ?, active = ?, license_key_id = ?,
-      target_audience = ?, price_per_code = ?
+      target_audience = ?, price_per_code = ?, event_amount = ?
     WHERE id = ?
   `).run(
     name || event.name,
@@ -154,6 +155,7 @@ router.put('/:id', verifyToken, requireAdmin, (req, res) => {
     effectiveLicenseId,
     target_audience !== undefined ? target_audience : event.target_audience,
     price_per_code !== undefined ? Math.max(0, parseFloat(price_per_code) || 0) : event.price_per_code,
+    event_amount !== undefined ? Math.max(0, parseFloat(event_amount) || 0) : event.event_amount,
     req.params.id
   );
 

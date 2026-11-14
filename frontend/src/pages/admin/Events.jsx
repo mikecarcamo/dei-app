@@ -142,7 +142,7 @@ export function CodesDialog({ open, event, onClose }) {
 }
 
 function EventDialog({ open, event, entities, tests, licenses, onClose, onSaved }) {
-  const blank = { entity_id: '', test_id: '', name: '', active: true, license_key_id: '', target_audience: '', codes_count: '', price_per_code: '' };
+  const blank = { entity_id: '', test_id: '', name: '', active: true, license_key_id: '', target_audience: '', codes_count: '', codes_extra: '', price_per_code: '', event_amount: '' };
   const [form, setForm] = useState(blank);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -159,7 +159,13 @@ function EventDialog({ open, event, entities, tests, licenses, onClose, onSaved 
         license_key_id: event.license_key_id || '',
         target_audience: event.target_audience || '',
         codes_count: event.codes_count || '',
+        codes_extra: '',
         price_per_code: event.price_per_code || '',
+        event_amount: event.test_type === 'CLIMA'
+          ? (event.price_per_code && (event.generated_codes ?? event.codes_count)
+              ? (event.price_per_code * (event.generated_codes ?? event.codes_count)).toFixed(2)
+              : '')
+          : (event.event_amount || ''),
       });
     } else {
       setForm(blank);
@@ -177,6 +183,32 @@ function EventDialog({ open, event, entities, tests, licenses, onClose, onSaved 
   const selectedLicense = allLicenses.find(lk => lk.id === form.license_key_id);
   const selectedEntityName = entities.find(e => e.id === form.entity_id)?.name || '';
   const isClima = tests.find(t => t.id === form.test_id)?.test_type === 'CLIMA';
+
+  const calcTotal = (f) =>
+    (event ? (event.generated_codes ?? event.codes_count ?? 0) : (parseInt(f.codes_count) || 0))
+    + (parseInt(f.codes_extra) || 0);
+
+  const updatePrice = (v) => {
+    setForm(f => {
+      const total = calcTotal(f);
+      return { ...f, price_per_code: v, event_amount: v && total ? (parseFloat(v) * total).toFixed(2) : f.event_amount };
+    });
+  };
+  const updateMonto = (v) => {
+    setForm(f => {
+      const total = calcTotal(f);
+      return { ...f, event_amount: v, price_per_code: v && total ? (parseFloat(v) / total).toFixed(2) : f.price_per_code };
+    });
+  };
+  const updateCodes = (key, v) => {
+    setForm(f => {
+      const next = { ...f, [key]: v };
+      const total = calcTotal(next);
+      if (next.price_per_code && total) next.event_amount = (parseFloat(next.price_per_code) * total).toFixed(2);
+      else if (next.event_amount && total) next.price_per_code = (parseFloat(next.event_amount) / total).toFixed(2);
+      return next;
+    });
+  };
 
   const handleLicenseCreated = (license) => {
     setCreatedLicenses(prev => [...prev, license]);
@@ -199,10 +231,17 @@ function EventDialog({ open, event, entities, tests, licenses, onClose, onSaved 
         ...form,
         license_key_id: form.license_key_id,
         codes_count: isClima ? parseInt(form.codes_count) : undefined,
-        price_per_code: parseFloat(form.price_per_code) || 0,
+        price_per_code: isClima
+          ? (parseFloat(form.price_per_code) || (calcTotal(form) && form.event_amount ? parseFloat(form.event_amount) / calcTotal(form) : 0))
+          : 0,
+        event_amount: isClima ? 0 : (parseFloat(form.event_amount) || 0),
       };
       if (event) {
         await api.put(`/events/${event.id}`, payload);
+        const extra = parseInt(form.codes_extra) || 0;
+        if (isClima && extra > 0) {
+          await api.post(`/events/${event.id}/codes`, { count: extra });
+        }
       } else {
         await api.post('/events', payload);
       }
@@ -238,41 +277,67 @@ function EventDialog({ open, event, entities, tests, licenses, onClose, onSaved 
           </Alert>
         )}
         {isClima && (
+          <>
+            <TextField
+              label="Dirigido a *" fullWidth margin="normal"
+              value={form.target_audience}
+              onChange={e => setForm(f => ({ ...f, target_audience: e.target.value }))}
+              placeholder="Ej: Gerencia, Jefes de Taller, Personal administrativo"
+              helperText="Se mostrará en la parte superior de la encuesta"
+            />
+            <Box display="flex" gap={2}>
+              {event ? (
+                <TextField
+                  label="Cantidad de códigos" type="number" fullWidth margin="normal"
+                  value={event.generated_codes ?? event.codes_count ?? 0}
+                  InputProps={{ readOnly: true }}
+                  helperText="Códigos ya generados"
+                />
+              ) : (
+                <TextField
+                  label="Cantidad de códigos a generar *" type="number" fullWidth margin="normal"
+                  value={form.codes_count}
+                  onChange={e => updateCodes('codes_count', e.target.value)}
+                  inputProps={{ min: 1, max: 1000 }}
+                  helperText="Un código por participante"
+                />
+              )}
+              {event && (
+                <TextField
+                  label="Adicionales" type="number" fullWidth margin="normal"
+                  value={form.codes_extra}
+                  onChange={e => updateCodes('codes_extra', e.target.value)}
+                  inputProps={{ min: 0, max: 1000 }}
+                  helperText="Se generan al guardar"
+                />
+              )}
+            </Box>
+            <Box display="flex" gap={2}>
+              <TextField
+                label="Precio por código (Q)" type="number" fullWidth margin="normal"
+                value={form.price_per_code}
+                onChange={e => updatePrice(e.target.value)}
+                inputProps={{ min: 0, step: '0.01' }}
+              />
+              <TextField
+                label="Monto del evento (Q)" type="number" fullWidth margin="normal"
+                value={form.event_amount}
+                onChange={e => updateMonto(e.target.value)}
+                inputProps={{ min: 0, step: '0.01' }}
+                helperText={calcTotal(form) ? `${calcTotal(form)} códigos en total` : ''}
+              />
+            </Box>
+          </>
+        )}
+        {!isClima && (
           <TextField
-            label="Dirigido a *" fullWidth margin="normal"
-            value={form.target_audience}
-            onChange={e => setForm(f => ({ ...f, target_audience: e.target.value }))}
-            placeholder="Ej: Gerencia, Jefes de Taller, Personal administrativo"
-            helperText="Se mostrará en la parte superior de la encuesta"
+            label="Monto del evento (Q)" type="number" fullWidth margin="normal"
+            value={form.event_amount}
+            onChange={e => setForm(f => ({ ...f, event_amount: e.target.value }))}
+            inputProps={{ min: 0, step: '0.01' }}
+            helperText="Precio acordado por el evento completo (se desconoce cuántos formularios se responderán)"
           />
         )}
-        {isClima && !event && (
-          <TextField
-            label="Cantidad de códigos a generar *" type="number" fullWidth margin="normal"
-            value={form.codes_count}
-            onChange={e => setForm(f => ({ ...f, codes_count: e.target.value }))}
-            inputProps={{ min: 1, max: 1000 }}
-            helperText="Un código por participante; cada uno solo puede usarse una vez. Luego puede agregar más desde «Ver códigos»."
-          />
-        )}
-        <TextField
-          label={isClima ? 'Precio por código (Q)' : 'Precio por formulario (Q)'}
-          type="number" fullWidth margin="normal"
-          value={form.price_per_code}
-          onChange={e => setForm(f => ({ ...f, price_per_code: e.target.value }))}
-          inputProps={{ min: 0, step: '0.01' }}
-          helperText={
-            isClima
-              ? (event
-                  ? `Monto del evento: Q${((event.generated_codes ?? event.codes_count ?? 0) * (parseFloat(form.price_per_code) || 0)).toFixed(2)} (${event.generated_codes ?? event.codes_count ?? 0} códigos generados)`
-                  : form.codes_count && form.price_per_code
-                    ? `Monto estimado del evento: Q${(parseInt(form.codes_count) * parseFloat(form.price_per_code)).toFixed(2)}`
-                    : 'Opcional. El monto se calcula como códigos generados × precio.')
-              : (event
-                  ? `Monto acumulado: Q${((event.response_count || 0) * (parseFloat(form.price_per_code) || 0)).toFixed(2)} (${event.response_count || 0} formularios respondidos)`
-                  : 'Opcional. El monto se calcula al final: formularios respondidos × precio.')
-          }
-        />
         {form.entity_id ? (
           <>
             <FormControl fullWidth margin="normal">
@@ -293,9 +358,11 @@ function EventDialog({ open, event, entities, tests, licenses, onClose, onSaved 
                 No hay licencias activas disponibles para esta entidad.
               </Alert>
             )}
-            <Button size="small" startIcon={<VpnKey />} onClick={() => setLicenseDialogOpen(true)} sx={{ mb: 1 }}>
-              Crear licencia para {selectedEntityName}
-            </Button>
+            {!form.license_key_id && (
+              <Button size="small" startIcon={<VpnKey />} onClick={() => setLicenseDialogOpen(true)} sx={{ mb: 1 }}>
+                Crear licencia para {selectedEntityName}
+              </Button>
+            )}
             {selectedLicense && (
               <Alert severity="success" variant="outlined">
                 Fechas del evento: <b>{selectedLicense.valid_from} → {selectedLicense.valid_to}</b> (tomadas de la licencia)
@@ -469,9 +536,14 @@ export default function Events() {
                   <TableRow key={ev.id} hover>
                     <TableCell fontWeight={600}>
                       {ev.name}
-                      {(ev.price_per_code || 0) > 0 && (
+                      {ev.test_type === 'CLIMA' && (ev.price_per_code || 0) > 0 && (
                         <Typography variant="caption" display="block" color="text.secondary">
-                          Q{ev.price_per_code.toFixed(2)} × {ev.test_type === 'CLIMA' ? (ev.generated_codes ?? 0) : (ev.response_count ?? 0)} = <b>Q{((ev.test_type === 'CLIMA' ? (ev.generated_codes ?? 0) : (ev.response_count ?? 0)) * ev.price_per_code).toFixed(2)}</b>
+                          Q{ev.price_per_code.toFixed(2)} × {ev.generated_codes ?? 0} = <b>Q{((ev.generated_codes ?? 0) * ev.price_per_code).toFixed(2)}</b>
+                        </Typography>
+                      )}
+                      {ev.test_type !== 'CLIMA' && (ev.event_amount || 0) > 0 && (
+                        <Typography variant="caption" display="block" color="text.secondary">
+                          Monto del evento: <b>Q{ev.event_amount.toFixed(2)}</b>
                         </Typography>
                       )}
                     </TableCell>
