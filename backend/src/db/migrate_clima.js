@@ -9,6 +9,10 @@ if (!ecols.includes('target_audience')) {
   db.exec(`ALTER TABLE events ADD COLUMN codes_count INTEGER NOT NULL DEFAULT 0`);
   console.log('Columnas target_audience y codes_count agregadas a events');
 }
+if (!ecols.includes('price_per_code')) {
+  db.exec(`ALTER TABLE events ADD COLUMN price_per_code REAL NOT NULL DEFAULT 0`);
+  console.log('Columna price_per_code agregada a events');
+}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS access_codes (

@@ -58,40 +58,75 @@ function LicenseDialog({ open, entityId, entityName, onClose, onCreated }) {
 export function CodesDialog({ open, event, onClose }) {
   const [codes, setCodes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [copied, setCopied] = useState(false);
+  const [addCount, setAddCount] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (!open || !event) return;
+  const loadCodes = () => {
     setLoading(true);
     api.get(`/events/${event.id}/codes`)
       .then(({ data }) => setCodes(data))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    if (!open || !event) return;
+    setError('');
+    setAddCount('');
+    loadCodes();
   }, [open, event]);
 
-  const baseUrl = window.location.origin;
-  const copyAll = () => {
-    const text = codes.map(c => `${baseUrl}/encuesta/${c.code}`).join('\n');
-    navigator.clipboard.writeText(text).then(() => setCopied(true));
+  const handleAdd = async () => {
+    const count = parseInt(addCount);
+    if (!count || count < 1) { setError('Indique cuántos códigos adicionales generar'); return; }
+    setAdding(true);
+    setError('');
+    try {
+      const { data } = await api.post(`/events/${event.id}/codes`, { count });
+      setCodes(data.codes);
+      setAddCount('');
+    } catch (e) {
+      setError(e.response?.data?.message || 'Error al generar códigos');
+    } finally {
+      setAdding(false);
+    }
   };
+
+  const pricePerCode = parseFloat(event?.price_per_code) || 0;
+  const used = codes.filter(c => c.used).length;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>Códigos de acceso — {event?.name}</DialogTitle>
       <DialogContent>
+        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
         <Alert severity="info" sx={{ mb: 2 }}>
-          Comparta un enlace único a cada participante. Cada código solo puede usarse una vez.
+          Los códigos se asignan automáticamente al presionar «Iniciar Test» en la sesión del usuario asignado. Cada código solo puede usarse una vez.
         </Alert>
-        <Button size="small" variant="outlined" onClick={copyAll} sx={{ mb: 2 }}>
-          {copied ? 'Enlaces copiados' : 'Copiar todos los enlaces'}
-        </Button>
+        <Box display="flex" gap={1} alignItems="center" mb={2}>
+          <TextField
+            label="Agregar códigos" type="number" size="small" sx={{ width: 180 }}
+            value={addCount} onChange={e => setAddCount(e.target.value)}
+            inputProps={{ min: 1, max: 1000 }}
+          />
+          <Button variant="contained" size="small" onClick={handleAdd} disabled={adding}>
+            {adding ? <CircularProgress size={18} /> : 'Generar'}
+          </Button>
+          <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
+            {used}/{codes.length} usados
+          </Typography>
+        </Box>
+        {pricePerCode > 0 && (
+          <Alert severity="success" variant="outlined" sx={{ mb: 2 }}>
+            Precio por código: <b>Q{pricePerCode.toFixed(2)}</b> · Monto del evento: <b>Q{(codes.length * pricePerCode).toFixed(2)}</b> ({codes.length} códigos)
+          </Alert>
+        )}
         {loading ? <CircularProgress /> : (
           <List dense sx={{ maxHeight: 360, overflow: 'auto' }}>
             {codes.map(c => (
               <ListItem key={c.id} disablePadding>
                 <ListItemText
                   primary={<Typography sx={{ fontFamily: 'monospace', fontSize: 14 }}>{c.code}</Typography>}
-                  secondary={`${baseUrl}/encuesta/${c.code}`}
-                  secondaryTypographyProps={{ fontSize: 11 }}
                 />
                 <Chip label={c.used ? 'Usado' : 'Disponible'} size="small" color={c.used ? 'default' : 'success'} />
               </ListItem>
@@ -107,7 +142,7 @@ export function CodesDialog({ open, event, onClose }) {
 }
 
 function EventDialog({ open, event, entities, tests, licenses, onClose, onSaved }) {
-  const blank = { entity_id: '', test_id: '', name: '', active: true, license_key_id: '', target_audience: '', codes_count: '' };
+  const blank = { entity_id: '', test_id: '', name: '', active: true, license_key_id: '', target_audience: '', codes_count: '', price_per_code: '' };
   const [form, setForm] = useState(blank);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -124,6 +159,7 @@ function EventDialog({ open, event, entities, tests, licenses, onClose, onSaved 
         license_key_id: event.license_key_id || '',
         target_audience: event.target_audience || '',
         codes_count: event.codes_count || '',
+        price_per_code: event.price_per_code || '',
       });
     } else {
       setForm(blank);
@@ -159,7 +195,12 @@ function EventDialog({ open, event, entities, tests, licenses, onClose, onSaved 
     }
     setLoading(true);
     try {
-      const payload = { ...form, license_key_id: form.license_key_id, codes_count: isClima ? parseInt(form.codes_count) : undefined };
+      const payload = {
+        ...form,
+        license_key_id: form.license_key_id,
+        codes_count: isClima ? parseInt(form.codes_count) : undefined,
+        price_per_code: isClima ? parseFloat(form.price_per_code) || 0 : undefined,
+      };
       if (event) {
         await api.put(`/events/${event.id}`, payload);
       } else {
@@ -196,23 +237,38 @@ function EventDialog({ open, event, entities, tests, licenses, onClose, onSaved 
             Encuesta anónima: los participantes responderán con un código único, sin identificarse.
           </Alert>
         )}
+        {isClima && (
+          <TextField
+            label="Dirigido a *" fullWidth margin="normal"
+            value={form.target_audience}
+            onChange={e => setForm(f => ({ ...f, target_audience: e.target.value }))}
+            placeholder="Ej: Gerencia, Jefes de Taller, Personal administrativo"
+            helperText="Se mostrará en la parte superior de la encuesta"
+          />
+        )}
         {isClima && !event && (
-          <>
-            <TextField
-              label="Dirigido a *" fullWidth margin="normal"
-              value={form.target_audience}
-              onChange={e => setForm(f => ({ ...f, target_audience: e.target.value }))}
-              placeholder="Ej: Gerencia, Jefes de Taller, Personal administrativo"
-              helperText="Se mostrará en la parte superior de la encuesta"
-            />
-            <TextField
-              label="Cantidad de códigos a generar *" type="number" fullWidth margin="normal"
-              value={form.codes_count}
-              onChange={e => setForm(f => ({ ...f, codes_count: e.target.value }))}
-              inputProps={{ min: 1, max: 1000 }}
-              helperText="Un código por participante; cada uno solo puede usarse una vez"
-            />
-          </>
+          <TextField
+            label="Cantidad de códigos a generar *" type="number" fullWidth margin="normal"
+            value={form.codes_count}
+            onChange={e => setForm(f => ({ ...f, codes_count: e.target.value }))}
+            inputProps={{ min: 1, max: 1000 }}
+            helperText="Un código por participante; cada uno solo puede usarse una vez. Luego puede agregar más desde «Ver códigos»."
+          />
+        )}
+        {isClima && (
+          <TextField
+            label="Precio por código (Q)" type="number" fullWidth margin="normal"
+            value={form.price_per_code}
+            onChange={e => setForm(f => ({ ...f, price_per_code: e.target.value }))}
+            inputProps={{ min: 0, step: '0.01' }}
+            helperText={
+              event
+                ? `Monto del evento: Q${((event.codes_count || 0) * (parseFloat(form.price_per_code) || 0)).toFixed(2)} (${event.codes_count || 0} códigos generados)`
+                : form.codes_count && form.price_per_code
+                  ? `Monto estimado del evento: Q${(parseInt(form.codes_count) * parseFloat(form.price_per_code)).toFixed(2)}`
+                  : 'Opcional. El monto del evento se calcula como códigos × precio.'
+            }
+          />
         )}
         {form.entity_id ? (
           <>

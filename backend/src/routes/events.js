@@ -78,7 +78,7 @@ router.post('/', verifyToken, requireAdmin, [
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-  const { entity_id, test_id, name, active, license_key_id, target_audience, codes_count } = req.body;
+  const { entity_id, test_id, name, active, license_key_id, target_audience, codes_count, price_per_code } = req.body;
 
   const key = db.prepare(`SELECT * FROM license_keys WHERE id = ?`).get(license_key_id);
   if (!key) return res.status(400).json({ message: 'Licencia no encontrada' });
@@ -97,11 +97,13 @@ router.post('/', verifyToken, requireAdmin, [
     }
   }
 
+  const pricePerCode = isClima ? Math.max(0, parseFloat(price_per_code) || 0) : 0;
+
   const result = db.prepare(`
-    INSERT INTO events (entity_id, test_id, name, start_date, end_date, active, license_key_id, target_audience, codes_count)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO events (entity_id, test_id, name, start_date, end_date, active, license_key_id, target_audience, codes_count, price_per_code)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(entity_id, test_id, name.trim(), key.valid_from, key.valid_to, active !== false ? 1 : 0, license_key_id,
-    isClima ? target_audience.trim() : null, isClima ? codes_count : 0);
+    isClima ? target_audience.trim() : null, isClima ? codes_count : 0, pricePerCode);
 
   db.prepare(`UPDATE license_keys SET event_id = ? WHERE id = ?`).run(result.lastInsertRowid, license_key_id);
   if (isClima) createCodes(result.lastInsertRowid, codes_count);
@@ -113,7 +115,7 @@ router.put('/:id', verifyToken, requireAdmin, (req, res) => {
   const event = db.prepare(`SELECT * FROM events WHERE id = ?`).get(req.params.id);
   if (!event) return res.status(404).json({ message: 'Evento no encontrado' });
 
-  const { name, active, license_key_id } = req.body;
+  const { name, active, license_key_id, target_audience, price_per_code } = req.body;
 
   let newKey = null;
   if (license_key_id && license_key_id !== event.license_key_id) {
@@ -137,7 +139,8 @@ router.put('/:id', verifyToken, requireAdmin, (req, res) => {
     : db.prepare(`SELECT valid_from, valid_to FROM license_keys WHERE id = ?`).get(effectiveLicenseId) || { from: event.start_date, to: event.end_date };
 
   db.prepare(`
-    UPDATE events SET name = ?, start_date = ?, end_date = ?, active = ?, license_key_id = ?
+    UPDATE events SET name = ?, start_date = ?, end_date = ?, active = ?, license_key_id = ?,
+      target_audience = ?, price_per_code = ?
     WHERE id = ?
   `).run(
     name || event.name,
@@ -145,6 +148,8 @@ router.put('/:id', verifyToken, requireAdmin, (req, res) => {
     dates.to,
     active !== undefined ? (active ? 1 : 0) : event.active,
     effectiveLicenseId,
+    target_audience !== undefined ? target_audience : event.target_audience,
+    price_per_code !== undefined ? Math.max(0, parseFloat(price_per_code) || 0) : event.price_per_code,
     req.params.id
   );
 
@@ -224,6 +229,32 @@ router.get('/:id/codes', verifyToken, requireRole('ADMIN', 'EMPRESA'), (req, res
   }
   const codes = db.prepare(`SELECT id, code, used, created_at FROM access_codes WHERE event_id = ? ORDER BY id`).all(req.params.id);
   res.json(codes);
+});
+
+router.post('/:id/codes', verifyToken, requireRole('ADMIN', 'EMPRESA'), [
+  body('count').isInt({ min: 1, max: 1000 }).withMessage('Indique entre 1 y 1000 códigos'),
+], (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+  const event = db.prepare(`
+    SELECT ev.*, t.test_type FROM events ev JOIN tests t ON ev.test_id = t.id WHERE ev.id = ?
+  `).get(req.params.id);
+  if (!event) return res.status(404).json({ message: 'Evento no encontrado' });
+  if (event.test_type !== 'CLIMA') return res.status(400).json({ message: 'Solo los eventos de Clima Laboral usan códigos' });
+  if (req.user.role === 'EMPRESA' && event.entity_id !== req.user.entity_id) {
+    return res.status(403).json({ message: 'Sin acceso a este evento' });
+  }
+
+  const count = parseInt(req.body.count);
+  const tx = db.transaction(() => {
+    createCodes(event.id, count);
+    db.prepare(`UPDATE events SET codes_count = codes_count + ? WHERE id = ?`).run(count, event.id);
+  });
+  tx();
+
+  const codes = db.prepare(`SELECT id, code, used, created_at FROM access_codes WHERE event_id = ? ORDER BY id`).all(event.id);
+  res.status(201).json({ codes, codes_count: event.codes_count + count });
 });
 
 module.exports = router;
