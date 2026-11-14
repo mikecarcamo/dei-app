@@ -571,7 +571,7 @@ function classifyClima(pct, isExternal) {
   return isExternal ? { tipo: 'Amenaza', color: CLIMA_COLORS.amenaza } : { tipo: 'Debilidad', color: CLIMA_COLORS.debilidad };
 }
 
-function generateClimaConsolidatedPDF(doc, event, indicatorStats, factorStats, responses, aiAnalysis) {
+function generateClimaConsolidatedPDF(doc, event, indicatorStats, factorStats, responses, aiAnalysis, includeAnswers) {
   markDarkPage(doc);
   doc.rect(0, 0, doc.page.width, 90).fill(COLORS.success);
   doc.fillColor(COLORS.white).fontSize(20).font('Helvetica-Bold')
@@ -717,6 +717,42 @@ function generateClimaConsolidatedPDF(doc, event, indicatorStats, factorStats, r
     doc.font('Helvetica-Bold').text(`${s.pct.toFixed(1)}%`, colX[2], y + 3, { width: colW[2] });
     doc.fillColor(s.color).text(s.tipo.toUpperCase(), colX[3], y + 3, { width: colW[3] });
     y += Math.max(14, doc.heightOfString(s.text, { width: colW[1] }) + 6);
+  }
+
+  // Tabla de participantes (anónima por código)
+  doc.addPage();
+  markDarkPage(doc);
+  y = 50;
+  doc.fontSize(13).font('Helvetica-Bold').fillColor(COLORS.success).text('PARTICIPANTES', 40, y);
+  y += 22;
+
+  const pColX = [40, 80, 330, 430];
+  const pColW = [40, 250, 100, doc.page.width - 80 - 390];
+  doc.rect(40, y, doc.page.width - 80, 20).fill(COLORS.success);
+  doc.fillColor(COLORS.white).fontSize(9).font('Helvetica-Bold');
+  doc.text('No', pColX[0], y + 5, { width: pColW[0] });
+  doc.text('Código de participación', pColX[1], y + 5, { width: pColW[1] });
+  doc.text('Ponderación', pColX[2], y + 5, { width: pColW[2] });
+  doc.text('Fecha', pColX[3], y + 5, { width: pColW[3] });
+  y += 22;
+
+  responses.forEach((r, i) => {
+    if (y > doc.page.height - 80) { doc.addPage(); y = 50; }
+    doc.fillColor(COLORS.text).fontSize(9).font('Helvetica');
+    doc.text(String(i + 1), pColX[0], y + 3, { width: pColW[0] });
+    doc.font('Helvetica-Bold').text(r.participant_full_name || '—', pColX[1], y + 3, { width: pColW[1] });
+    doc.text(`${(r.clima_score || 0).toFixed(2)}%`, pColX[2], y + 3, { width: pColW[2] });
+    const fecha = r.submitted_at ? new Date(r.submitted_at.replace(' ', 'T')).toLocaleString('es-GT', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+    doc.fontSize(8).text(fecha, pColX[3], y + 3, { width: pColW[3] });
+    y += 16;
+  });
+
+  // Detalle: cada encuesta individual al final
+  if (includeAnswers) {
+    for (const r of responses) {
+      doc.addPage();
+      generateClimaIndividualPDF(doc, r, event, r.answers || []);
+    }
   }
 }
 

@@ -135,13 +135,29 @@ router.get('/consolidated/:eventId', verifyToken, async (req, res) => {
       }
     }
 
+    const detailParam = req.query.detail;
+    const includeAnswers = detailParam === 'full';
+    let responsesWithAnswers = responses;
+    if (includeAnswers) {
+      responsesWithAnswers = responses.map(r => {
+        const answers = db.prepare(`
+          SELECT ra.numeric_value, q.number, q.text as question_text, q.section
+          FROM response_answers ra
+          JOIN questions q ON ra.question_id = q.id
+          WHERE ra.response_id = ?
+          ORDER BY q.number
+        `).all(r.id);
+        return { ...r, answers };
+      });
+    }
+
     const doc = createDoc();
     const safeName = (event.name || 'evento').replace(/[^a-zA-Z0-9_\-\s]/g, '').replace(/\s+/g, '_');
     res.setHeader('Content-Type', 'application/pdf');
     const viewMode = req.query.view === 'true';
     res.setHeader('Content-Disposition', `${viewMode ? 'inline' : 'attachment'}; filename="consolidado_clima_${safeName}.pdf"`);
     doc.pipe(res);
-    generateClimaConsolidatedPDF(doc, event, indicatorStats, factorStats, responses, aiAnalysis);
+    generateClimaConsolidatedPDF(doc, event, indicatorStats, factorStats, responsesWithAnswers, aiAnalysis, includeAnswers);
     appendDisclaimer(doc);
     addPageNumbers(doc, doc._darkPages);
     doc.end();
