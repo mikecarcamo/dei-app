@@ -607,6 +607,49 @@ function generateClimaConsolidatedPDF(doc, event, indicatorStats, factorStats, r
   doc.rect(40, y, doc.page.width - 80, 1).fill(COLORS.border);
   y += 15;
 
+  // Análisis cuantitativo — termómetro del promedio general
+  const overall = factorStats.length ? factorStats.reduce((a, f) => a + f.pct, 0) / factorStats.length : 0;
+  const gaugeClass = overall >= 90 ? { t: 'Excelente', c: '#1565C0' }
+    : overall >= 80 ? { t: 'Bueno', c: '#2E7D32' }
+    : overall >= 66 ? { t: 'Regular', c: '#F9A825' }
+    : { t: 'Desfavorable', c: '#C62828' };
+
+  if (y > doc.page.height - 260) { doc.addPage(); markDarkPage(doc); y = 50; }
+  doc.fontSize(13).font('Helvetica-Bold').fillColor(COLORS.success).text('ANÁLISIS CUANTITATIVO', 40, y);
+  y += 20;
+
+  const infoW = 200, rowH = 26;
+  doc.rect(40, y, 110, rowH).fill('#F5F1E4').stroke('#DDD');
+  doc.rect(150, y, 90, rowH).fill(gaugeClass.c).stroke('#DDD');
+  doc.fillColor(COLORS.text).fontSize(10).font('Helvetica-Bold').text('Promedio', 48, y + 8);
+  doc.fillColor(COLORS.white).text(overall.toFixed(2), 150, y + 8, { width: 90, align: 'center' });
+  doc.rect(40, y + rowH, 110, rowH).fill('#F5F1E4').stroke('#DDD');
+  doc.rect(150, y + rowH, 90, rowH).fill(gaugeClass.c).stroke('#DDD');
+  doc.fillColor(COLORS.text).text('Clasificación', 48, y + rowH + 8);
+  doc.fillColor(COLORS.white).text(gaugeClass.t, 150, y + rowH + 8, { width: 90, align: 'center' });
+
+  const gx = 260, gw = doc.page.width - 80 - (gx - 40), gy = y + 8, gh = 40;
+  doc.roundedRect(gx, gy, gw, gh, 10).fillAndStroke('#EFEFEF', '#CCC');
+  for (let v = 0; v <= 100; v += 10) {
+    const tx = gx + (v / 100) * (gw - 24) + 12;
+    doc.moveTo(tx, gy + 6).lineTo(tx, gy + (v % 20 === 0 ? 16 : 11)).stroke('#999');
+    if (v % 20 === 0) {
+      doc.fillColor('#666').fontSize(7).font('Helvetica').text(String(v), tx - 8, gy + gh - 12, { width: 16, align: 'center' });
+    }
+  }
+  const markerX = gx + 12 + (Math.max(0, Math.min(100, overall)) / 100) * (gw - 24);
+  doc.polygon(
+    [markerX, gy - 2], [markerX - 6, gy - 12], [markerX + 6, gy - 12]
+  ).fill(gaugeClass.c);
+  doc.roundedRect(markerX - 3, gy - 2, 6, gh + 4, 3).fill(gaugeClass.c);
+  y += rowH * 2 + 20;
+
+  y = drawSignature(doc, y);
+
+  doc.addPage();
+  markDarkPage(doc);
+  y = 50;
+
   doc.fontSize(13).font('Helvetica-Bold').fillColor(COLORS.success).text('CLASIFICACIÓN DE INDICADORES', 40, y);
   y += 18;
   const counts = { Fortaleza: 0, Oportunidad: 0, Amenaza: 0, Debilidad: 0 };
