@@ -199,7 +199,7 @@ function EventDialog({ open, event, entities, tests, licenses, onClose, onSaved 
         ...form,
         license_key_id: form.license_key_id,
         codes_count: isClima ? parseInt(form.codes_count) : undefined,
-        price_per_code: isClima ? parseFloat(form.price_per_code) || 0 : undefined,
+        price_per_code: parseFloat(form.price_per_code) || 0,
       };
       if (event) {
         await api.put(`/events/${event.id}`, payload);
@@ -255,21 +255,24 @@ function EventDialog({ open, event, entities, tests, licenses, onClose, onSaved 
             helperText="Un código por participante; cada uno solo puede usarse una vez. Luego puede agregar más desde «Ver códigos»."
           />
         )}
-        {isClima && (
-          <TextField
-            label="Precio por código (Q)" type="number" fullWidth margin="normal"
-            value={form.price_per_code}
-            onChange={e => setForm(f => ({ ...f, price_per_code: e.target.value }))}
-            inputProps={{ min: 0, step: '0.01' }}
-            helperText={
-              event
-                ? `Monto del evento: Q${((event.codes_count || 0) * (parseFloat(form.price_per_code) || 0)).toFixed(2)} (${event.codes_count || 0} códigos generados)`
-                : form.codes_count && form.price_per_code
-                  ? `Monto estimado del evento: Q${(parseInt(form.codes_count) * parseFloat(form.price_per_code)).toFixed(2)}`
-                  : 'Opcional. El monto del evento se calcula como códigos × precio.'
-            }
-          />
-        )}
+        <TextField
+          label={isClima ? 'Precio por código (Q)' : 'Precio por formulario (Q)'}
+          type="number" fullWidth margin="normal"
+          value={form.price_per_code}
+          onChange={e => setForm(f => ({ ...f, price_per_code: e.target.value }))}
+          inputProps={{ min: 0, step: '0.01' }}
+          helperText={
+            isClima
+              ? (event
+                  ? `Monto del evento: Q${((event.generated_codes ?? event.codes_count ?? 0) * (parseFloat(form.price_per_code) || 0)).toFixed(2)} (${event.generated_codes ?? event.codes_count ?? 0} códigos generados)`
+                  : form.codes_count && form.price_per_code
+                    ? `Monto estimado del evento: Q${(parseInt(form.codes_count) * parseFloat(form.price_per_code)).toFixed(2)}`
+                    : 'Opcional. El monto se calcula como códigos generados × precio.')
+              : (event
+                  ? `Monto acumulado: Q${((event.response_count || 0) * (parseFloat(form.price_per_code) || 0)).toFixed(2)} (${event.response_count || 0} formularios respondidos)`
+                  : 'Opcional. El monto se calcula al final: formularios respondidos × precio.')
+          }
+        />
         {form.entity_id ? (
           <>
             <FormControl fullWidth margin="normal">
@@ -464,7 +467,14 @@ export default function Events() {
               <TableBody>
                 {events.map(ev => (
                   <TableRow key={ev.id} hover>
-                    <TableCell fontWeight={600}>{ev.name}</TableCell>
+                    <TableCell fontWeight={600}>
+                      {ev.name}
+                      {(ev.price_per_code || 0) > 0 && (
+                        <Typography variant="caption" display="block" color="text.secondary">
+                          Q{ev.price_per_code.toFixed(2)} × {ev.test_type === 'CLIMA' ? (ev.generated_codes ?? 0) : (ev.response_count ?? 0)} = <b>Q{((ev.test_type === 'CLIMA' ? (ev.generated_codes ?? 0) : (ev.response_count ?? 0)) * ev.price_per_code).toFixed(2)}</b>
+                        </Typography>
+                      )}
+                    </TableCell>
                     <TableCell sx={{ fontSize: 13 }}>{ev.entity_name}</TableCell>
                     <TableCell sx={{ fontSize: 13 }}>
                       {ev.test_name}

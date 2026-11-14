@@ -38,7 +38,9 @@ router.get('/', verifyToken, requireRole('ADMIN', 'EMPRESA'), (req, res) => {
   if (req.user.role === 'EMPRESA') {
     events = db.prepare(`
       SELECT ev.*, e.name as entity_name, t.name as test_name, t.test_type,
-             lk.key_value, lk.status as license_status
+             lk.key_value, lk.status as license_status,
+             (SELECT COUNT(*) FROM responses r WHERE r.event_id = ev.id AND r.annulled = 0) as response_count,
+             (SELECT COUNT(*) FROM access_codes ac WHERE ac.event_id = ev.id) as generated_codes
       FROM events ev
       LEFT JOIN entities e ON ev.entity_id = e.id
       LEFT JOIN tests t ON ev.test_id = t.id
@@ -49,7 +51,9 @@ router.get('/', verifyToken, requireRole('ADMIN', 'EMPRESA'), (req, res) => {
   } else {
     events = db.prepare(`
       SELECT ev.*, e.name as entity_name, t.name as test_name, t.test_type,
-             lk.key_value, lk.status as license_status
+             lk.key_value, lk.status as license_status,
+             (SELECT COUNT(*) FROM responses r WHERE r.event_id = ev.id AND r.annulled = 0) as response_count,
+             (SELECT COUNT(*) FROM access_codes ac WHERE ac.event_id = ev.id) as generated_codes
       FROM events ev
       LEFT JOIN entities e ON ev.entity_id = e.id
       LEFT JOIN tests t ON ev.test_id = t.id
@@ -97,7 +101,7 @@ router.post('/', verifyToken, requireAdmin, [
     }
   }
 
-  const pricePerCode = isClima ? Math.max(0, parseFloat(price_per_code) || 0) : 0;
+  const pricePerCode = Math.max(0, parseFloat(price_per_code) || 0);
 
   const result = db.prepare(`
     INSERT INTO events (entity_id, test_id, name, start_date, end_date, active, license_key_id, target_audience, codes_count, price_per_code)
