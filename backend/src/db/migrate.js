@@ -116,4 +116,21 @@ db.exec(`
   );
 `);
 
+db.exec(`
+  CREATE TRIGGER IF NOT EXISTS tests_unique_name_insert
+  BEFORE INSERT ON tests
+  WHEN EXISTS (SELECT 1 FROM tests WHERE lower(trim(name)) = lower(trim(NEW.name)))
+  BEGIN
+    SELECT RAISE(ABORT, 'Ya existe una plantilla con ese nombre');
+  END;
+
+  CREATE TRIGGER IF NOT EXISTS tests_unique_name_update
+  BEFORE UPDATE OF name ON tests
+  WHEN lower(trim(NEW.name)) != lower(trim(OLD.name))
+    AND EXISTS (SELECT 1 FROM tests WHERE lower(trim(name)) = lower(trim(NEW.name)) AND id != OLD.id)
+  BEGIN
+    SELECT RAISE(ABORT, 'Ya existe una plantilla con ese nombre');
+  END;
+`);
+
 console.log('Migraciones completadas.');

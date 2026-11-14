@@ -25,6 +25,8 @@ router.post('/', verifyToken, requireAdmin, [
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
   const { name, description } = req.body;
+  const existing = db.prepare(`SELECT id FROM tests WHERE lower(trim(name)) = lower(trim(?))`).get(name);
+  if (existing) return res.status(409).json({ message: 'Ya existe una plantilla con ese nombre' });
   const result = db.prepare(`INSERT INTO tests (name, description) VALUES (?, ?)`).run(name.trim(), description || null);
   res.status(201).json(db.prepare(`SELECT * FROM tests WHERE id = ?`).get(result.lastInsertRowid));
 });
@@ -33,6 +35,11 @@ router.put('/:id', verifyToken, requireAdmin, (req, res) => {
   const test = db.prepare(`SELECT * FROM tests WHERE id = ?`).get(req.params.id);
   if (!test) return res.status(404).json({ message: 'Test no encontrado' });
   const { name, description, active } = req.body;
+  if (name !== undefined && (typeof name !== 'string' || !name.trim())) {
+    return res.status(400).json({ message: 'Nombre requerido' });
+  }
+  const existing = db.prepare(`SELECT id FROM tests WHERE lower(trim(name)) = lower(trim(?)) AND id != ?`).get(name || test.name, test.id);
+  if (existing) return res.status(409).json({ message: 'Ya existe una plantilla con ese nombre' });
   db.prepare(`UPDATE tests SET name = ?, description = ?, active = ? WHERE id = ?`).run(
     name || test.name, description !== undefined ? description : test.description,
     active !== undefined ? (active ? 1 : 0) : test.active, req.params.id

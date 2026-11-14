@@ -23,11 +23,14 @@ const adminUser = db.prepare(`SELECT id FROM users WHERE email = 'mikenoecarcamo
 console.log('Usuario admin creado/verificado, id:', adminUser.id);
 
 const insertTest = db.prepare(`
-  INSERT OR IGNORE INTO tests (name, description, active) VALUES (?, ?, 1)
+  INSERT INTO tests (name, description, active)
+  SELECT ?, ?, 1
+  WHERE NOT EXISTS (SELECT 1 FROM tests WHERE lower(trim(name)) = lower(trim(?)))
 `);
 insertTest.run(
   'Test de Personalidad',
-  'Test de temperamentos basado en el modelo de los cuatro temperamentos: Sanguíneo, Colérico, Melancólico y Flemático. Este resultado es orientativo y no constituye diagnóstico psicológico clínico.'
+  'Test de temperamentos basado en el modelo de los cuatro temperamentos: Sanguíneo, Colérico, Melancólico y Flemático. Este resultado es orientativo y no constituye diagnóstico psicológico clínico.',
+  'Test de Personalidad'
 );
 const test = db.prepare(`SELECT id FROM tests WHERE name = 'Test de Personalidad'`).get();
 console.log('Test creado/verificado, id:', test.id);
