@@ -1,5 +1,6 @@
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const MODEL = 'llama-3.3-70b-versatile';
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const GEMINI_MODEL = 'gemini-2.5-flash';
 
 function classify(pct, isExternal) {
   if (pct >= 90) return 'Excelente';
@@ -8,10 +9,48 @@ function classify(pct, isExternal) {
   return isExternal ? 'Amenaza' : 'Desfavorable';
 }
 
-async function generateClimaAnalysis(event, factorStats, indicatorStats, responsesCount) {
+async function callGroq(prompt, signal) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) return null;
+  const resp = await fetch(GROQ_URL, { signal,
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.4,
+      max_tokens: 1400,
+    }),
+  });
+  if (!resp.ok) {
+    console.error('Groq API error:', resp.status, await resp.text());
+    return null;
+  }
+  const data = await resp.json();
+  return data.choices?.[0]?.message?.content?.trim() || null;
+}
 
+async function callGemini(prompt, signal) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
+  const resp = await fetch(url, { signal,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.4, maxOutputTokens: 2000 },
+    }),
+  });
+  if (!resp.ok) {
+    console.error('Gemini API error:', resp.status, await resp.text());
+    return null;
+  }
+  const data = await resp.json();
+  return data.candidates?.[0]?.content?.parts?.map(p => p.text).join('').trim() || null;
+}
+
+async function generateClimaAnalysis(event, factorStats, indicatorStats, responsesCount) {
   const overall = factorStats.length
     ? factorStats.reduce((a, f) => a + f.pct, 0) / factorStats.length
     : 0;
@@ -59,33 +98,20 @@ Reglas:
 - Texto plano: NO uses markdown, asteriscos, numerales ni viñetas con símbolos. Las recomendaciones numéralas como "1.", "2.", etc. en líneas separadas.
 - No inventes datos que no estén en el contexto.`;
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25000);
-  try {
-    const resp = await fetch(GROQ_URL, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.4,
-        max_tokens: 1400,
-      }),
-      signal: controller.signal,
-    });
-    if (!resp.ok) {
-      console.error('Groq API error:', resp.status, await resp.text());
-      return null;
+  // 1) Groq (free tier generoso) — 2) Gemini como respaldo
+  for (const call of [callGroq, callGemini]) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
+    try {
+      const text = await call(prompt, controller.signal);
+      if (text) return text;
+    } catch (e) {
+      console.error('AI provider error:', e.message);
+    } finally {
+      clearTimeout(timeout);
     }
-    const data = await resp.json();
-    const text = data.choices?.[0]?.message?.content?.trim();
-    return text || null;
-  } catch (e) {
-    console.error('Groq request failed:', e.message);
-    return null;
-  } finally {
-    clearTimeout(timeout);
   }
+  return null;
 }
 
 module.exports = { generateClimaAnalysis };
