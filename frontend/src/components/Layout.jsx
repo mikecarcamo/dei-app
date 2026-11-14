@@ -27,6 +27,7 @@ const adminMenuItems = [
 const empresaMenuItems = [
   { label: 'Dashboard', icon: <Dashboard />, path: '/admin' },
   { label: 'Usuarios', icon: <People />, path: '/admin/users' },
+  { label: 'Eventos', icon: <Event />, path: '/admin/my-events' },
   { label: 'Resultados Empresa', icon: <BarChart />, path: '/my-results' },
 ];
 

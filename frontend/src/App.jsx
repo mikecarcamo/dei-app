@@ -19,6 +19,7 @@ import Tests from './pages/admin/Tests';
 import Events from './pages/admin/Events';
 import Licenses from './pages/admin/Licenses';
 import Reports from './pages/admin/Reports';
+import EmpresaEvents from './pages/admin/EmpresaEvents';
 
 const theme = createTheme({
   palette: {
@@ -78,13 +79,18 @@ export default function App() {
             <Route element={<ProtectedRoute roles={['ADMIN', 'EMPRESA']} />}>
               <Route element={<AdminLayout />}>
                 <Route path="/admin" element={<AdminDashboard />} />
-                <Route path="/admin/entities" element={<Entities />} />
                 <Route path="/admin/users" element={<Users />} />
+                <Route path="/admin/my-events" element={<EmpresaEvents />} />
+                <Route path="/my-results" element={<MyResults />} />
+              </Route>
+            </Route>
+            <Route element={<ProtectedRoute roles={['ADMIN']} />}>
+              <Route element={<AdminLayout />}>
+                <Route path="/admin/entities" element={<Entities />} />
                 <Route path="/admin/tests" element={<Tests />} />
                 <Route path="/admin/events" element={<Events />} />
                 <Route path="/admin/licenses" element={<Licenses />} />
                 <Route path="/admin/reports" element={<Reports />} />
-                <Route path="/my-results" element={<MyResults />} />
               </Route>
             </Route>
 

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const db = require('../db/database');
-const { verifyToken, requireAdmin } = require('../middleware/auth');
+const { verifyToken, requireAdmin, requireRole } = require('../middleware/auth');
 
 function getEventFull(id) {
   const event = db.prepare(`
@@ -23,22 +23,39 @@ function getEventFull(id) {
   return event;
 }
 
-router.get('/', verifyToken, requireAdmin, (req, res) => {
-  const events = db.prepare(`
-    SELECT ev.*, e.name as entity_name, t.name as test_name, t.test_type,
-           lk.key_value, lk.status as license_status
-    FROM events ev
-    LEFT JOIN entities e ON ev.entity_id = e.id
-    LEFT JOIN tests t ON ev.test_id = t.id
-    LEFT JOIN license_keys lk ON ev.license_key_id = lk.id
-    ORDER BY ev.created_at DESC
-  `).all();
+router.get('/', verifyToken, requireRole('ADMIN', 'EMPRESA'), (req, res) => {
+  let events;
+  if (req.user.role === 'EMPRESA') {
+    events = db.prepare(`
+      SELECT ev.*, e.name as entity_name, t.name as test_name, t.test_type,
+             lk.key_value, lk.status as license_status
+      FROM events ev
+      LEFT JOIN entities e ON ev.entity_id = e.id
+      LEFT JOIN tests t ON ev.test_id = t.id
+      LEFT JOIN license_keys lk ON ev.license_key_id = lk.id
+      WHERE ev.entity_id = ?
+      ORDER BY ev.created_at DESC
+    `).all(req.user.entity_id);
+  } else {
+    events = db.prepare(`
+      SELECT ev.*, e.name as entity_name, t.name as test_name, t.test_type,
+             lk.key_value, lk.status as license_status
+      FROM events ev
+      LEFT JOIN entities e ON ev.entity_id = e.id
+      LEFT JOIN tests t ON ev.test_id = t.id
+      LEFT JOIN license_keys lk ON ev.license_key_id = lk.id
+      ORDER BY ev.created_at DESC
+    `).all();
+  }
   res.json(events);
 });
 
-router.get('/:id', verifyToken, requireAdmin, (req, res) => {
+router.get('/:id', verifyToken, requireRole('ADMIN', 'EMPRESA'), (req, res) => {
   const event = getEventFull(req.params.id);
   if (!event) return res.status(404).json({ message: 'Evento no encontrado' });
+  if (req.user.role === 'EMPRESA' && event.entity_id !== req.user.entity_id) {
+    return res.status(403).json({ message: 'Sin acceso a este evento' });
+  }
   res.json(event);
 });
 
@@ -111,7 +128,7 @@ router.put('/:id', verifyToken, requireAdmin, (req, res) => {
   res.json(getEventFull(req.params.id));
 });
 
-router.post('/:id/users', verifyToken, requireAdmin, [
+router.post('/:id/users', verifyToken, requireRole('ADMIN', 'EMPRESA'), [
   body('user_ids').isArray({ min: 1 }).withMessage('Se requiere al menos un usuario'),
 ], (req, res) => {
   const errors = validationResult(req);
@@ -119,15 +136,27 @@ router.post('/:id/users', verifyToken, requireAdmin, [
 
   const event = db.prepare(`SELECT * FROM events WHERE id = ?`).get(req.params.id);
   if (!event) return res.status(404).json({ message: 'Evento no encontrado' });
+  if (req.user.role === 'EMPRESA' && event.entity_id !== req.user.entity_id) {
+    return res.status(403).json({ message: 'Sin acceso a este evento' });
+  }
 
   const insert = db.prepare(`INSERT OR IGNORE INTO event_users (event_id, user_id) VALUES (?, ?)`);
+  const validUser = db.prepare(`SELECT id FROM users WHERE id = ? AND entity_id = ?`);
   for (const uid of req.body.user_ids) {
+    if (!validUser.get(uid, event.entity_id)) {
+      return res.status(400).json({ message: 'Solo puede asignar usuarios de la entidad del evento' });
+    }
     insert.run(req.params.id, uid);
   }
   res.json({ message: 'Usuarios asignados', assigned_users: db.prepare(`SELECT eu.user_id, u.full_name, u.email FROM event_users eu JOIN users u ON eu.user_id = u.id WHERE eu.event_id = ?`).all(req.params.id) });
 });
 
-router.delete('/:id/users/:uid', verifyToken, requireAdmin, (req, res) => {
+router.delete('/:id/users/:uid', verifyToken, requireRole('ADMIN', 'EMPRESA'), (req, res) => {
+  const event = db.prepare(`SELECT * FROM events WHERE id = ?`).get(req.params.id);
+  if (!event) return res.status(404).json({ message: 'Evento no encontrado' });
+  if (req.user.role === 'EMPRESA' && event.entity_id !== req.user.entity_id) {
+    return res.status(403).json({ message: 'Sin acceso a este evento' });
+  }
   db.prepare(`DELETE FROM event_users WHERE event_id = ? AND user_id = ?`).run(req.params.id, req.params.uid);
   res.json({ message: 'Usuario removido del evento' });
 });

@@ -190,7 +190,7 @@ function EventDialog({ open, event, entities, tests, licenses, onClose, onSaved 
   );
 }
 
-function AssignUsersDialog({ open, event, onClose, onSaved }) {
+export function AssignUsersDialog({ open, event, onClose, onSaved }) {
   const [users, setUsers] = useState([]);
   const [assigned, setAssigned] = useState([]);
   const [loading, setLoading] = useState(true);
