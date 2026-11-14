@@ -51,7 +51,8 @@ router.get('/my-events/:eventId/results', verifyToken, (req, res) => {
       SELECT r.id, r.participant_full_name, r.score_a, r.score_b, r.score_c, r.score_d,
              r.dominant_temperament, r.secondary_temperament, r.submitted_at,
              r.burnout_ce, r.burnout_dp, r.burnout_rp,
-             r.burnout_ce_nivel, r.burnout_dp_nivel, r.burnout_rp_nivel, r.burnout_diagnostico
+             r.burnout_ce_nivel, r.burnout_dp_nivel, r.burnout_rp_nivel, r.burnout_diagnostico,
+             r.clima_score
       FROM responses r
       WHERE r.event_id = ? AND r.annulled = 0
       ORDER BY r.submitted_at DESC
@@ -62,7 +63,8 @@ router.get('/my-events/:eventId/results', verifyToken, (req, res) => {
       SELECT r.id, r.participant_full_name, r.score_a, r.score_b, r.score_c, r.score_d,
              r.dominant_temperament, r.secondary_temperament, r.submitted_at,
              r.burnout_ce, r.burnout_dp, r.burnout_rp,
-             r.burnout_ce_nivel, r.burnout_dp_nivel, r.burnout_rp_nivel, r.burnout_diagnostico
+             r.burnout_ce_nivel, r.burnout_dp_nivel, r.burnout_rp_nivel, r.burnout_diagnostico,
+             r.clima_score
       FROM responses r
       WHERE r.event_id = ? AND r.user_id = ? AND r.annulled = 0
       ORDER BY r.submitted_at DESC

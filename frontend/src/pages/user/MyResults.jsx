@@ -76,6 +76,7 @@ function ConsolidatedDialog({ open, event, onClose }) {
 
 function ResultCard({ result, testType, onViewPdf }) {
   const isBurnout = testType === 'BURNOUT';
+  const isClima = testType === 'CLIMA';
   const total = result.score_a + result.score_b + result.score_c + result.score_d;
   const domLabel = (result.dominant_temperament || '').replace('SANGUINEO', 'Sanguíneo').replace('COLERICO', 'Colérico').replace('MELANCOLICO', 'Melancólico').replace('FLEMATICO', 'Flemático');
 
@@ -93,7 +94,8 @@ function ResultCard({ result, testType, onViewPdf }) {
           <Typography fontWeight={700}>{result.participant_full_name}</Typography>
         </Box>
         <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
-          {!isBurnout && domLabel && <Chip label={domLabel} size="small" sx={{ bgcolor: '#E3F2FD', color: '#1565C0', fontWeight: 700 }} />}
+          {isClima && <Chip label="Anónimo" size="small" sx={{ bgcolor: '#E8F5E9', color: '#2E7D32', fontWeight: 700 }} />}
+          {!isBurnout && !isClima && domLabel && <Chip label={domLabel} size="small" sx={{ bgcolor: '#E3F2FD', color: '#1565C0', fontWeight: 700 }} />}
           {isBurnout && result.burnout_diagnostico && (
             <Chip label={result.burnout_diagnostico.split('.')[0]} size="small" sx={{ bgcolor: '#FBE9E7', color: '#BF360C', fontWeight: 700, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }} />
           )}
@@ -103,7 +105,18 @@ function ResultCard({ result, testType, onViewPdf }) {
         </Box>
       </Box>
 
-      {isBurnout ? (
+      {isClima ? (
+        <Box display="flex" alignItems="center" gap={1.5}>
+          <Typography variant="caption" sx={{ minWidth: 140, color: 'text.secondary' }}>Ponderación general</Typography>
+          <Box flex={1}>
+            <LinearProgress variant="determinate" value={result.clima_score || 0}
+              sx={{ height: 8, borderRadius: 4, bgcolor: '#F5F5F5', '& .MuiLinearProgress-bar': { bgcolor: '#2E7D32', borderRadius: 4 } }} />
+          </Box>
+          <Typography variant="caption" fontWeight={700} sx={{ minWidth: 60, textAlign: 'right' }}>
+            {(result.clima_score || 0).toFixed(1)}%
+          </Typography>
+        </Box>
+      ) : isBurnout ? (
         <Box>
           {burnoutSubescalas.map(s => (
             <Box key={s.label} display="flex" alignItems="center" gap={1.5} mb={0.8}>
