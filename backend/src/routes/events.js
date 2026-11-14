@@ -139,9 +139,11 @@ router.put('/:id', verifyToken, requireAdmin, (req, res) => {
   }
 
   const effectiveLicenseId = license_key_id !== undefined ? license_key_id : event.license_key_id;
-  const dates = newKey
-    ? { from: newKey.valid_from, to: newKey.valid_to }
-    : db.prepare(`SELECT valid_from, valid_to FROM license_keys WHERE id = ?`).get(effectiveLicenseId) || { from: event.start_date, to: event.end_date };
+  const licRow = newKey || db.prepare(`SELECT valid_from, valid_to FROM license_keys WHERE id = ?`).get(effectiveLicenseId);
+  const dates = {
+    from: (licRow && licRow.valid_from) || event.start_date,
+    to: (licRow && licRow.valid_to) || event.end_date,
+  };
 
   db.prepare(`
     UPDATE events SET name = ?, start_date = ?, end_date = ?, active = ?, license_key_id = ?,
