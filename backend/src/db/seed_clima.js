@@ -29,19 +29,19 @@ const questions = [
   { number: 2,  section: 'SATISFACCION GENERAL', text: 'Se toman en cuenta las iniciativas y sugerencias personales y se nos da el crédito por ello.' },
   { number: 3,  section: 'SATISFACCION GENERAL', text: 'En mi área de trabajo se trabaja con paz laboral, sin intimidaciones ni amenazas.' },
   { number: 4,  section: 'SATISFACCION GENERAL', text: 'Me siento satisfecho/a con los beneficios que me otorga la empresa/institución.' },
-  { number: 5,  section: 'SATISFACCION GENERAL', text: 'Me siento satisfecho/a de trabajar en la empresa.' },
+  { number: 5,  section: 'SATISFACCION GENERAL', text: 'Me siento satisfecho/a de trabajar en la empresa/institución.' },
   { number: 6,  section: 'SATISFACCION GENERAL', text: 'Existe equidad en la distribución del trabajo.' },
   // COMPROMISO LABORAL
-  { number: 7,  section: 'COMPROMISO LABORAL', text: 'Mi trabajo contribuye al logro de los objetivos de la empresa.' },
+  { number: 7,  section: 'COMPROMISO LABORAL', text: 'Mi trabajo contribuye al logro de los objetivos de la empresa/institución.' },
   { number: 8,  section: 'COMPROMISO LABORAL', text: 'Tengo la justa libertad en la toma de decisiones en mi trabajo.' },
-  { number: 9,  section: 'COMPROMISO LABORAL', text: 'Me siento comprometido/a con la visión y misión de la empresa.' },
+  { number: 9,  section: 'COMPROMISO LABORAL', text: 'Me siento comprometido/a con la visión y misión de la empresa/institución.' },
   { number: 10, section: 'COMPROMISO LABORAL', text: 'En mi área de trabajo puedo ver el compromiso de mi jefe y compañeros hacia el logro de objetivos.' },
   { number: 11, section: 'COMPROMISO LABORAL', text: 'Existe apoyo por parte de mis compañeros cuando hay necesidad de trabajar tiempo extra.' },
   // MOTIVACIÓN LABORAL
   { number: 12, section: 'MOTIVACION LABORAL', text: 'Actualmente aprovecho mis habilidades en el trabajo.' },
   { number: 13, section: 'MOTIVACION LABORAL', text: 'El trabajo que realizo es valorado por mi jefe.' },
   { number: 14, section: 'MOTIVACION LABORAL', text: 'Mis compañeros realizan su trabajo no solo por su salario, sino con iniciativa propia.' },
-  { number: 15, section: 'MOTIVACION LABORAL', text: 'Trabajando en la empresa creo que puedo lograr mis objetivos personales.' },
+  { number: 15, section: 'MOTIVACION LABORAL', text: 'Trabajando en la empresa/institución creo que puedo lograr mis objetivos personales.' },
   { number: 16, section: 'MOTIVACION LABORAL', text: 'Me siento estimulado/a para aportar nuevas y mejores formas de realizar mi trabajo.' },
   { number: 17, section: 'MOTIVACION LABORAL', text: 'Prefiero laborar en mi área de trabajo que trasladarme a otra con igual remuneración.' },
   // SERVICIO AL USUARIO
@@ -50,10 +50,10 @@ const questions = [
   { number: 20, section: 'SERVICIO AL USUARIO', text: 'Mis compañeros muestran un trato amable y cortés con los usuarios.' },
   // DESARROLLO PERSONAL
   { number: 21, section: 'DESARROLLO PERSONAL', text: 'En mi área de trabajo, cuando existe una plaza vacante, la primera opción es promover al personal interno.' },
-  { number: 22, section: 'DESARROLLO PERSONAL', text: 'Existen oportunidades dentro de la empresa para desarrollarme laboralmente.', external: 1 },
+  { number: 22, section: 'DESARROLLO PERSONAL', text: 'Existen oportunidades dentro de la empresa/institución para desarrollarme laboralmente.', external: 1 },
   { number: 23, section: 'DESARROLLO PERSONAL', text: 'El personal que sobresale laboralmente es identificado y apoyado para su superación.' },
   { number: 24, section: 'DESARROLLO PERSONAL', text: 'Los cursos de capacitación durante el último año han mejorado mis conocimientos y habilidades en el puesto que desempeño.', external: 1 },
-  { number: 25, section: 'DESARROLLO PERSONAL', text: 'La empresa se ocupa por investigar las necesidades de capacitación en nuestra área de trabajo.', external: 1 },
+  { number: 25, section: 'DESARROLLO PERSONAL', text: 'La empresa/institución se ocupa por investigar las necesidades de capacitación en nuestra área de trabajo.', external: 1 },
   // AMBIENTE FÍSICO
   { number: 26, section: 'AMBIENTE FISICO', text: 'En mi trabajo la limpieza y el orden es satisfactorio.', external: 1 },
   { number: 27, section: 'AMBIENTE FISICO', text: 'Considero que la distribución física de mi área me permite realizar mi trabajo cómoda y eficientemente.', external: 1 },
