@@ -127,8 +127,8 @@ router.get('/consolidated/:eventId', verifyToken, async (req, res) => {
       return { section: sec, pct: items.reduce((a, b) => a + b.pct, 0) / items.length };
     });
 
-    let aiAnalysis = event.ai_analysis || null;
-    if (!aiAnalysis && responses.length > 0) {
+    let aiAnalysis = null;
+    if (responses.length > 0) {
       aiAnalysis = await generateClimaAnalysis(event, factorStats, indicatorStats, responses.length);
       if (aiAnalysis) {
         db.prepare(`UPDATE events SET ai_analysis = ? WHERE id = ?`).run(aiAnalysis, event.id);
