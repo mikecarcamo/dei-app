@@ -46,29 +46,25 @@ router.post('/', verifyToken, requireAdmin, [
   body('entity_id').notEmpty().withMessage('Entidad requerida'),
   body('test_id').notEmpty().withMessage('Test requerido'),
   body('name').notEmpty().trim().withMessage('Nombre requerido'),
-  body('start_date').notEmpty().withMessage('Fecha inicio requerida'),
-  body('end_date').notEmpty().withMessage('Fecha fin requerida'),
+  body('license_key_id').notEmpty().withMessage('Licencia requerida'),
 ], (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-  const { entity_id, test_id, name, start_date, end_date, active, license_key_id } = req.body;
+  const { entity_id, test_id, name, active, license_key_id } = req.body;
 
-  if (license_key_id) {
-    const key = db.prepare(`SELECT * FROM license_keys WHERE id = ?`).get(license_key_id);
-    if (!key) return res.status(400).json({ message: 'Licencia no encontrada' });
-    if (key.event_id && key.event_id !== null) return res.status(400).json({ message: 'Esa licencia ya está asignada a otro evento' });
-    if (key.status !== 'activa') return res.status(400).json({ message: 'La licencia no está activa' });
-  }
+  const key = db.prepare(`SELECT * FROM license_keys WHERE id = ?`).get(license_key_id);
+  if (!key) return res.status(400).json({ message: 'Licencia no encontrada' });
+  if (key.event_id && key.event_id !== null) return res.status(400).json({ message: 'Esa licencia ya está asignada a otro evento' });
+  if (key.status !== 'activa') return res.status(400).json({ message: 'La licencia no está activa' });
+  if (key.entity_id !== parseInt(entity_id)) return res.status(400).json({ message: 'La licencia no pertenece a esa entidad' });
 
   const result = db.prepare(`
     INSERT INTO events (entity_id, test_id, name, start_date, end_date, active, license_key_id)
     VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(entity_id, test_id, name.trim(), start_date, end_date, active !== false ? 1 : 0, license_key_id || null);
+  `).run(entity_id, test_id, name.trim(), key.valid_from, key.valid_to, active !== false ? 1 : 0, license_key_id);
 
-  if (license_key_id) {
-    db.prepare(`UPDATE license_keys SET event_id = ? WHERE id = ?`).run(result.lastInsertRowid, license_key_id);
-  }
+  db.prepare(`UPDATE license_keys SET event_id = ? WHERE id = ?`).run(result.lastInsertRowid, license_key_id);
 
   res.status(201).json(getEventFull(result.lastInsertRowid));
 });
@@ -77,8 +73,9 @@ router.put('/:id', verifyToken, requireAdmin, (req, res) => {
   const event = db.prepare(`SELECT * FROM events WHERE id = ?`).get(req.params.id);
   if (!event) return res.status(404).json({ message: 'Evento no encontrado' });
 
-  const { name, start_date, end_date, active, license_key_id } = req.body;
+  const { name, active, license_key_id } = req.body;
 
+  let newKey = null;
   if (license_key_id && license_key_id !== event.license_key_id) {
     const key = db.prepare(`SELECT * FROM license_keys WHERE id = ?`).get(license_key_id);
     if (!key) return res.status(400).json({ message: 'Licencia no encontrada' });
@@ -86,21 +83,28 @@ router.put('/:id', verifyToken, requireAdmin, (req, res) => {
       return res.status(400).json({ message: 'Esa licencia ya está asignada a otro evento' });
     }
     if (key.status !== 'activa') return res.status(400).json({ message: 'La licencia no está activa' });
+    if (key.entity_id !== event.entity_id) return res.status(400).json({ message: 'La licencia no pertenece a la entidad del evento' });
+    newKey = key;
     if (event.license_key_id) {
       db.prepare(`UPDATE license_keys SET event_id = NULL WHERE id = ?`).run(event.license_key_id);
     }
     db.prepare(`UPDATE license_keys SET event_id = ? WHERE id = ?`).run(req.params.id, license_key_id);
   }
 
+  const effectiveLicenseId = license_key_id !== undefined ? license_key_id : event.license_key_id;
+  const dates = newKey
+    ? { from: newKey.valid_from, to: newKey.valid_to }
+    : db.prepare(`SELECT valid_from, valid_to FROM license_keys WHERE id = ?`).get(effectiveLicenseId) || { from: event.start_date, to: event.end_date };
+
   db.prepare(`
     UPDATE events SET name = ?, start_date = ?, end_date = ?, active = ?, license_key_id = ?
     WHERE id = ?
   `).run(
     name || event.name,
-    start_date || event.start_date,
-    end_date || event.end_date,
+    dates.from,
+    dates.to,
     active !== undefined ? (active ? 1 : 0) : event.active,
-    license_key_id !== undefined ? license_key_id : event.license_key_id,
+    effectiveLicenseId,
     req.params.id
   );
 

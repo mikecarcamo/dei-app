@@ -9,11 +9,59 @@ import {
 import { Add, Edit, People, VpnKey } from '@mui/icons-material';
 import api from '../../api/axios';
 
+function LicenseDialog({ open, entityId, entityName, onClose, onCreated }) {
+  const [form, setForm] = useState({ valid_from: '', valid_to: '' });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => { setForm({ valid_from: '', valid_to: '' }); setError(''); }, [open]);
+
+  const handleSave = async () => {
+    if (!form.valid_from || !form.valid_to) { setError('Indique las fechas de vigencia'); return; }
+    if (form.valid_to < form.valid_from) { setError('La fecha fin no puede ser anterior a la fecha inicio'); return; }
+    setLoading(true);
+    try {
+      const { data } = await api.post('/licenses/generate', {
+        entity_id: entityId,
+        valid_from: form.valid_from,
+        valid_to: form.valid_to,
+      });
+      onCreated(data);
+    } catch (e) {
+      setError(e.response?.data?.message || 'Error al crear la licencia');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+      <DialogTitle>Nueva Licencia — {entityName}</DialogTitle>
+      <DialogContent>
+        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          La vigencia de la licencia definirá las fechas del evento.
+        </Typography>
+        <TextField label="Válida desde *" type="date" fullWidth margin="normal" value={form.valid_from} onChange={e => setForm(f => ({ ...f, valid_from: e.target.value }))} InputLabelProps={{ shrink: true }} />
+        <TextField label="Válida hasta *" type="date" fullWidth margin="normal" value={form.valid_to} onChange={e => setForm(f => ({ ...f, valid_to: e.target.value }))} InputLabelProps={{ shrink: true }} />
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancelar</Button>
+        <Button variant="contained" onClick={handleSave} disabled={loading}>
+          {loading ? <CircularProgress size={20} /> : 'Generar licencia'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 function EventDialog({ open, event, entities, tests, licenses, onClose, onSaved }) {
-  const blank = { entity_id: '', test_id: '', name: '', start_date: '', end_date: '', active: true, license_key_id: '' };
+  const blank = { entity_id: '', test_id: '', name: '', active: true, license_key_id: '' };
   const [form, setForm] = useState(blank);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [licenseDialogOpen, setLicenseDialogOpen] = useState(false);
+  const [createdLicenses, setCreatedLicenses] = useState([]);
 
   useEffect(() => {
     if (event) {
@@ -21,8 +69,6 @@ function EventDialog({ open, event, entities, tests, licenses, onClose, onSaved 
         entity_id: event.entity_id || '',
         test_id: event.test_id || '',
         name: event.name || '',
-        start_date: event.start_date || '',
-        end_date: event.end_date || '',
         active: event.active === 1,
         license_key_id: event.license_key_id || '',
       });
@@ -30,20 +76,32 @@ function EventDialog({ open, event, entities, tests, licenses, onClose, onSaved 
       setForm(blank);
     }
     setError('');
+    setCreatedLicenses([]);
   }, [event, open]);
 
-  const availableLicenses = licenses.filter(lk =>
-    lk.status === 'activa' && (!lk.event_id || (event && lk.event_id === event.id))
+  const allLicenses = [...licenses, ...createdLicenses];
+  const availableLicenses = allLicenses.filter(lk =>
+    lk.status === 'activa'
+    && lk.entity_id === form.entity_id
+    && (!lk.event_id || (event && lk.event_id === event.id))
   );
+  const selectedLicense = allLicenses.find(lk => lk.id === form.license_key_id);
+  const selectedEntityName = entities.find(e => e.id === form.entity_id)?.name || '';
+
+  const handleLicenseCreated = (license) => {
+    setCreatedLicenses(prev => [...prev, license]);
+    setForm(f => ({ ...f, license_key_id: license.id }));
+    setLicenseDialogOpen(false);
+  };
 
   const handleSave = async () => {
-    if (!form.entity_id || !form.test_id || !form.name.trim() || !form.start_date || !form.end_date) {
+    if (!form.entity_id || !form.test_id || !form.name.trim() || !form.license_key_id) {
       setError('Todos los campos obligatorios deben completarse');
       return;
     }
     setLoading(true);
     try {
-      const payload = { ...form, license_key_id: form.license_key_id || null };
+      const payload = { ...form, license_key_id: form.license_key_id };
       if (event) {
         await api.put(`/events/${event.id}`, payload);
       } else {
@@ -65,7 +123,7 @@ function EventDialog({ open, event, entities, tests, licenses, onClose, onSaved 
         <TextField label="Nombre del evento *" fullWidth margin="normal" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} autoFocus />
         <FormControl fullWidth margin="normal">
           <InputLabel>Entidad *</InputLabel>
-          <Select value={form.entity_id} label="Entidad *" onChange={e => setForm(f => ({ ...f, entity_id: e.target.value }))}>
+          <Select value={form.entity_id} label="Entidad *" onChange={e => setForm(f => ({ ...f, entity_id: e.target.value, license_key_id: '' }))} disabled={!!event}>
             {entities.map(e => <MenuItem key={e.id} value={e.id}>{e.name}</MenuItem>)}
           </Select>
         </FormControl>
@@ -75,22 +133,38 @@ function EventDialog({ open, event, entities, tests, licenses, onClose, onSaved 
             {tests.filter(t => t.active).map(t => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
           </Select>
         </FormControl>
-        <TextField label="Fecha inicio *" type="date" fullWidth margin="normal" value={form.start_date} onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))} InputLabelProps={{ shrink: true }} />
-        <TextField label="Fecha fin *" type="date" fullWidth margin="normal" value={form.end_date} onChange={e => setForm(f => ({ ...f, end_date: e.target.value }))} InputLabelProps={{ shrink: true }} />
-        <FormControl fullWidth margin="normal">
-          <InputLabel>Licencia</InputLabel>
-          <Select value={form.license_key_id} label="Licencia" onChange={e => setForm(f => ({ ...f, license_key_id: e.target.value }))}>
-            <MenuItem value=""><em>Sin licencia (evento deshabilitado)</em></MenuItem>
-            {availableLicenses.map(lk => (
-              <MenuItem key={lk.id} value={lk.id}>
-                <Box>
-                  <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>{lk.key_value}</Typography>
-                  <Typography variant="caption" color="text.secondary">{lk.entity_name} · {lk.valid_from} → {lk.valid_to}</Typography>
-                </Box>
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        {form.entity_id ? (
+          <>
+            <FormControl fullWidth margin="normal">
+              <InputLabel>Licencia *</InputLabel>
+              <Select value={form.license_key_id} label="Licencia *" onChange={e => setForm(f => ({ ...f, license_key_id: e.target.value }))}>
+                {availableLicenses.map(lk => (
+                  <MenuItem key={lk.id} value={lk.id}>
+                    <Box>
+                      <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>{lk.key_value}</Typography>
+                      <Typography variant="caption" color="text.secondary">{lk.entity_name} · {lk.valid_from} → {lk.valid_to}</Typography>
+                    </Box>
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            {availableLicenses.length === 0 && (
+              <Alert severity="info" sx={{ mb: 1 }}>
+                No hay licencias activas disponibles para esta entidad.
+              </Alert>
+            )}
+            <Button size="small" startIcon={<VpnKey />} onClick={() => setLicenseDialogOpen(true)} sx={{ mb: 1 }}>
+              Crear licencia para {selectedEntityName}
+            </Button>
+            {selectedLicense && (
+              <Alert severity="success" variant="outlined">
+                Fechas del evento: <b>{selectedLicense.valid_from} → {selectedLicense.valid_to}</b> (tomadas de la licencia)
+              </Alert>
+            )}
+          </>
+        ) : (
+          <Alert severity="info" sx={{ mt: 1 }}>Seleccione primero una entidad para ver sus licencias.</Alert>
+        )}
         {event && (
           <Box display="flex" alignItems="center" gap={1} mt={1}>
             <Typography variant="body2">Activo:</Typography>
@@ -105,6 +179,13 @@ function EventDialog({ open, event, entities, tests, licenses, onClose, onSaved 
           {loading ? <CircularProgress size={20} /> : 'Guardar'}
         </Button>
       </DialogActions>
+      <LicenseDialog
+        open={licenseDialogOpen}
+        entityId={form.entity_id}
+        entityName={selectedEntityName}
+        onClose={() => setLicenseDialogOpen(false)}
+        onCreated={handleLicenseCreated}
+      />
     </Dialog>
   );
 }

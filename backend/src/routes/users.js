@@ -40,7 +40,7 @@ router.get('/:id', verifyToken, requireRole('ADMIN', 'EMPRESA'), (req, res) => {
   res.json(user);
 });
 
-router.post('/', verifyToken, requireAdmin, [
+router.post('/', verifyToken, requireRole('ADMIN', 'EMPRESA'), [
   body('full_name').notEmpty().trim().withMessage('Nombre completo requerido'),
   body('email').isEmail().withMessage('Email inválido'),
   body('password').isLength({ min: 8 }).withMessage('La contraseña debe tener al menos 8 caracteres'),
@@ -49,7 +49,17 @@ router.post('/', verifyToken, requireAdmin, [
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-  const { full_name, email, password, role, entity_id, must_change_password } = req.body;
+  let { full_name, email, password, role, entity_id, must_change_password } = req.body;
+
+  if (req.user.role === 'EMPRESA') {
+    if (role !== 'USUARIO') {
+      return res.status(403).json({ message: 'Solo puede crear usuarios con rol USUARIO' });
+    }
+    if (!req.user.entity_id) {
+      return res.status(403).json({ message: 'Su cuenta no tiene una entidad asignada' });
+    }
+    entity_id = req.user.entity_id;
+  }
   const passwordHash = bcrypt.hashSync(password, 12);
 
   try {

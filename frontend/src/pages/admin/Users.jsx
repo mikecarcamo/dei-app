@@ -7,6 +7,7 @@ import {
 } from '@mui/material';
 import { Add, Edit, Visibility, VisibilityOff, Refresh } from '@mui/icons-material';
 import api from '../../api/axios';
+import { useAuth } from '../../context/AuthContext';
 
 const ROLES = ['ADMIN', 'EMPRESA', 'USUARIO'];
 const ROLE_COLORS = { ADMIN: 'error', EMPRESA: 'warning', USUARIO: 'primary' };
@@ -16,7 +17,7 @@ function generatePassword() {
   return Array.from({ length: 12 }, () => c[Math.floor(Math.random() * c.length)]).join('');
 }
 
-function UserDialog({ open, user, entities, onClose, onSaved }) {
+function UserDialog({ open, user, entities, isEmpresa, onClose, onSaved }) {
   const blank = { full_name: '', email: '', password: '', role: 'USUARIO', entity_id: '', active: true, must_change_password: true };
   const [form, setForm] = useState(blank);
   const [showPass, setShowPass] = useState(false);
@@ -37,7 +38,9 @@ function UserDialog({ open, user, entities, onClose, onSaved }) {
     if (!user && form.password.length < 8) { setError('La contraseña debe tener al menos 8 caracteres'); return; }
     setLoading(true);
     try {
-      const payload = { ...form, entity_id: form.entity_id || null };
+      const payload = isEmpresa
+        ? { ...form, role: 'USUARIO', entity_id: undefined }
+        : { ...form, entity_id: form.entity_id || null };
       if (user) {
         if (!payload.password) delete payload.password;
         await api.put(`/users/${user.id}`, payload);
@@ -76,19 +79,27 @@ function UserDialog({ open, user, entities, onClose, onSaved }) {
             ),
           }}
         />
-        <FormControl fullWidth margin="normal">
-          <InputLabel>Rol *</InputLabel>
-          <Select value={form.role} label="Rol *" onChange={e => setForm(f => ({ ...f, role: e.target.value }))}>
-            {ROLES.map(r => <MenuItem key={r} value={r}>{r}</MenuItem>)}
-          </Select>
-        </FormControl>
-        <FormControl fullWidth margin="normal">
-          <InputLabel>Entidad</InputLabel>
-          <Select value={form.entity_id} label="Entidad" onChange={e => setForm(f => ({ ...f, entity_id: e.target.value }))}>
-            <MenuItem value="">Sin entidad</MenuItem>
-            {entities.map(e => <MenuItem key={e.id} value={e.id}>{e.name}</MenuItem>)}
-          </Select>
-        </FormControl>
+        {isEmpresa ? (
+          <Alert severity="info" variant="outlined" sx={{ mt: 1 }}>
+            El usuario se creará con rol <b>USUARIO</b> en su entidad.
+          </Alert>
+        ) : (
+          <>
+            <FormControl fullWidth margin="normal">
+              <InputLabel>Rol *</InputLabel>
+              <Select value={form.role} label="Rol *" onChange={e => setForm(f => ({ ...f, role: e.target.value }))}>
+                {ROLES.map(r => <MenuItem key={r} value={r}>{r}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth margin="normal">
+              <InputLabel>Entidad</InputLabel>
+              <Select value={form.entity_id} label="Entidad" onChange={e => setForm(f => ({ ...f, entity_id: e.target.value }))}>
+                <MenuItem value="">Sin entidad</MenuItem>
+                {entities.map(e => <MenuItem key={e.id} value={e.id}>{e.name}</MenuItem>)}
+              </Select>
+            </FormControl>
+          </>
+        )}
         {user && (
           <Box display="flex" alignItems="center" gap={2} mt={1}>
             <Box display="flex" alignItems="center" gap={1}>
@@ -119,6 +130,8 @@ function UserDialog({ open, user, entities, onClose, onSaved }) {
 }
 
 export default function Users() {
+  const { user: currentUser } = useAuth();
+  const isEmpresa = currentUser?.role === 'EMPRESA';
   const [users, setUsers] = useState([]);
   const [entities, setEntities] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -127,8 +140,9 @@ export default function Users() {
 
   const load = () => {
     setLoading(true);
-    Promise.all([api.get('/users'), api.get('/entities')])
-      .then(([u, e]) => { setUsers(u.data); setEntities(e.data); })
+    const requests = isEmpresa ? [api.get('/users')] : [api.get('/users'), api.get('/entities')];
+    Promise.all(requests)
+      .then(([u, e]) => { setUsers(u.data); if (e) setEntities(e.data); })
       .finally(() => setLoading(false));
   };
 
@@ -171,7 +185,9 @@ export default function Users() {
                     <TableCell><Chip label={u.active ? 'Activo' : 'Inactivo'} color={u.active ? 'success' : 'default'} size="small" /></TableCell>
                     <TableCell><Chip label={u.must_change_password ? 'Pendiente' : 'No'} color={u.must_change_password ? 'warning' : 'default'} size="small" /></TableCell>
                     <TableCell align="center">
-                      <Tooltip title="Editar"><IconButton size="small" onClick={() => { setSelected(u); setDialogOpen(true); }}><Edit fontSize="small" /></IconButton></Tooltip>
+                      {!isEmpresa && (
+                        <Tooltip title="Editar"><IconButton size="small" onClick={() => { setSelected(u); setDialogOpen(true); }}><Edit fontSize="small" /></IconButton></Tooltip>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -184,7 +200,7 @@ export default function Users() {
         )}
       </Card>
 
-      <UserDialog open={dialogOpen} user={selected} entities={entities} onClose={() => setDialogOpen(false)} onSaved={() => { setDialogOpen(false); load(); }} />
+      <UserDialog open={dialogOpen} user={selected} entities={entities} isEmpresa={isEmpresa} onClose={() => setDialogOpen(false)} onSaved={() => { setDialogOpen(false); load(); }} />
     </Box>
   );
 }
