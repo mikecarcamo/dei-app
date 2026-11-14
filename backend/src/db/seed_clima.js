@@ -28,7 +28,7 @@ const questions = [
   { number: 1,  section: 'SATISFACCION GENERAL', text: 'Estoy satisfecho/a con el trabajo que realizo.' },
   { number: 2,  section: 'SATISFACCION GENERAL', text: 'Se toman en cuenta las iniciativas y sugerencias personales y se nos da el crédito por ello.' },
   { number: 3,  section: 'SATISFACCION GENERAL', text: 'En mi área de trabajo se trabaja con paz laboral, sin intimidaciones ni amenazas.' },
-  { number: 4,  section: 'SATISFACCION GENERAL', text: 'Me siento satisfecho/a con los beneficios que me otorga la empresa.' },
+  { number: 4,  section: 'SATISFACCION GENERAL', text: 'Me siento satisfecho/a con los beneficios que me otorga la empresa/institución.' },
   { number: 5,  section: 'SATISFACCION GENERAL', text: 'Me siento satisfecho/a de trabajar en la empresa.' },
   { number: 6,  section: 'SATISFACCION GENERAL', text: 'Existe equidad en la distribución del trabajo.' },
   // COMPROMISO LABORAL
