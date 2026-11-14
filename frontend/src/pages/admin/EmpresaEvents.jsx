@@ -60,9 +60,11 @@ export default function EmpresaEvents() {
                     </TableCell>
                     <TableCell><Chip label={ev.active ? 'Activo' : 'Inactivo'} color={ev.active ? 'success' : 'default'} size="small" /></TableCell>
                     <TableCell align="center">
-                      <Tooltip title="Asignar usuarios">
-                        <IconButton size="small" onClick={() => { setSelected(ev); setDialogOpen(true); }}><People fontSize="small" /></IconButton>
-                      </Tooltip>
+                      {ev.active === 1 && (
+                        <Tooltip title="Asignar usuarios">
+                          <IconButton size="small" onClick={() => { setSelected(ev); setDialogOpen(true); }}><People fontSize="small" /></IconButton>
+                        </Tooltip>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

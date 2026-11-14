@@ -139,6 +139,7 @@ router.post('/:id/users', verifyToken, requireRole('ADMIN', 'EMPRESA'), [
   if (req.user.role === 'EMPRESA' && event.entity_id !== req.user.entity_id) {
     return res.status(403).json({ message: 'Sin acceso a este evento' });
   }
+  if (!event.active) return res.status(400).json({ message: 'No se pueden asignar usuarios a un evento inactivo' });
 
   const insert = db.prepare(`INSERT OR IGNORE INTO event_users (event_id, user_id) VALUES (?, ?)`);
   const validUser = db.prepare(`SELECT id FROM users WHERE id = ? AND entity_id = ?`);
