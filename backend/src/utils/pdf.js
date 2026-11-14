@@ -588,8 +588,18 @@ function generateClimaConsolidatedPDF(doc, event, indicatorStats, factorStats, r
 
   doc.fontSize(13).font('Helvetica-Bold').fillColor(COLORS.success).text('RESUMEN POR FACTOR', 40, y);
   y += 20;
+  const fullW = doc.page.width - 80;
   for (const f of factorStats) {
-    y = drawScoreBar(doc, y, `${f.section} (${f.pct.toFixed(1)}%):`, Math.round(f.pct), 100, COLORS.success);
+    const pct = Math.max(0, Math.min(100, f.pct));
+    doc.fontSize(10).font('Helvetica-Bold').fillColor(COLORS.text)
+      .text(f.section, 40, y, { width: fullW - 70 });
+    doc.fontSize(10).font('Helvetica-Bold').fillColor(COLORS.success)
+      .text(`${pct.toFixed(1)}%`, 40 + fullW - 70, y, { width: 70, align: 'right' });
+    const labelH = doc.heightOfString(f.section, { width: fullW - 70 });
+    const barY = y + labelH + 3;
+    doc.rect(40, barY, fullW, 12).fill('#E0E0E0');
+    if (pct > 0) doc.rect(40, barY, (pct / 100) * fullW, 12).fill(COLORS.success);
+    y = barY + 12 + 10;
   }
   y += 10;
   doc.rect(40, y, doc.page.width - 80, 1).fill(COLORS.border);
