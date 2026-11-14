@@ -571,7 +571,7 @@ function classifyClima(pct, isExternal) {
   return isExternal ? { tipo: 'Amenaza', color: CLIMA_COLORS.amenaza } : { tipo: 'Debilidad', color: CLIMA_COLORS.debilidad };
 }
 
-function generateClimaConsolidatedPDF(doc, event, indicatorStats, factorStats, responses) {
+function generateClimaConsolidatedPDF(doc, event, indicatorStats, factorStats, responses, aiAnalysis) {
   markDarkPage(doc);
   doc.rect(0, 0, doc.page.width, 90).fill(COLORS.success);
   doc.fillColor(COLORS.white).fontSize(20).font('Helvetica-Bold')
@@ -645,6 +645,36 @@ function generateClimaConsolidatedPDF(doc, event, indicatorStats, factorStats, r
   y += rowH * 2 + 20;
 
   y = drawSignature(doc, y);
+
+  if (aiAnalysis) {
+    doc.addPage();
+    markDarkPage(doc);
+    y = 50;
+    doc.fontSize(13).font('Helvetica-Bold').fillColor(COLORS.success).text('ANÁLISIS', 40, y);
+    y += 22;
+    const cleanText = aiAnalysis.replace(/\*\*/g, '').replace(/^#+\s*/gm, '').replace(/^[-•]\s*/gm, '');
+    const HEADERS = ['RESUMEN EJECUTIVO', 'FORTALEZAS', 'ÁREAS DE OPORTUNIDAD', 'AMENAZAS EXTERNAS', 'RECOMENDACIONES'];
+    for (const block of cleanText.split(/\n{2,}/)) {
+      const trimmed = block.trim();
+      if (!trimmed) continue;
+      const isHeader = HEADERS.includes(trimmed.replace(/:$/, ''));
+      if (isHeader) {
+        if (y > doc.page.height - 120) { doc.addPage(); markDarkPage(doc); y = 50; }
+        y += 6;
+        doc.fontSize(11).font('Helvetica-Bold').fillColor(COLORS.success).text(trimmed.replace(/:$/, ''), 40, y);
+        y += 16;
+      } else {
+        doc.fontSize(10).font('Helvetica').fillColor(COLORS.text);
+        const h = doc.heightOfString(trimmed, { width: doc.page.width - 80 });
+        if (y + h > doc.page.height - 60) { doc.addPage(); markDarkPage(doc); y = 50; }
+        doc.text(trimmed, 40, y, { width: doc.page.width - 80, align: 'justify' });
+        y += h + 8;
+      }
+    }
+    y += 6;
+    doc.fontSize(7.5).font('Helvetica-Oblique').fillColor(COLORS.muted)
+      .text('Análisis generado por inteligencia artificial a partir de las estadísticas del evento. Revise antes de su uso oficial.', 40, y, { width: doc.page.width - 80, align: 'center' });
+  }
 
   doc.addPage();
   markDarkPage(doc);

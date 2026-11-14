@@ -18,6 +18,10 @@ if (!db.pragma('table_info(events)').map(c => c.name).includes('event_amount')) 
   db.exec(`ALTER TABLE events ADD COLUMN event_amount REAL NOT NULL DEFAULT 0`);
   console.log('Columna event_amount agregada a events');
 }
+if (!db.pragma('table_info(events)').map(c => c.name).includes('ai_analysis')) {
+  db.exec(`ALTER TABLE events ADD COLUMN ai_analysis TEXT`);
+  console.log('Columna ai_analysis agregada a events');
+}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS access_codes (

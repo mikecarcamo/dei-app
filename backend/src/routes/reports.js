@@ -4,6 +4,7 @@ const PDFDocument = require('pdfkit');
 const db = require('../db/database');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
 const { generateIndividualPDF, generateConsolidatedPDF, generateClimaConsolidatedPDF, generateClimaIndividualPDF, appendDisclaimer, drawWatermark } = require('../utils/pdf');
+const { generateClimaAnalysis } = require('../utils/ai');
 
 function createDoc() {
   const doc = new PDFDocument({ margin: 40, size: 'LETTER', bufferPages: true });
@@ -87,7 +88,7 @@ router.get('/individual/:responseId', verifyToken, (req, res) => {
   doc.end();
 });
 
-router.get('/consolidated/:eventId', verifyToken, (req, res) => {
+router.get('/consolidated/:eventId', verifyToken, async (req, res) => {
   if (req.user.role !== 'ADMIN' && req.user.role !== 'EMPRESA') {
     return res.status(403).json({ message: 'Sin acceso' });
   }
@@ -125,13 +126,22 @@ router.get('/consolidated/:eventId', verifyToken, (req, res) => {
       const items = indicatorStats.filter(s => s.section === sec);
       return { section: sec, pct: items.reduce((a, b) => a + b.pct, 0) / items.length };
     });
+
+    let aiAnalysis = event.ai_analysis || null;
+    if (!aiAnalysis && responses.length > 0) {
+      aiAnalysis = await generateClimaAnalysis(event, factorStats, indicatorStats, responses.length);
+      if (aiAnalysis) {
+        db.prepare(`UPDATE events SET ai_analysis = ? WHERE id = ?`).run(aiAnalysis, event.id);
+      }
+    }
+
     const doc = createDoc();
     const safeName = (event.name || 'evento').replace(/[^a-zA-Z0-9_\-\s]/g, '').replace(/\s+/g, '_');
     res.setHeader('Content-Type', 'application/pdf');
     const viewMode = req.query.view === 'true';
     res.setHeader('Content-Disposition', `${viewMode ? 'inline' : 'attachment'}; filename="consolidado_clima_${safeName}.pdf"`);
     doc.pipe(res);
-    generateClimaConsolidatedPDF(doc, event, indicatorStats, factorStats, responses);
+    generateClimaConsolidatedPDF(doc, event, indicatorStats, factorStats, responses, aiAnalysis);
     appendDisclaimer(doc);
     addPageNumbers(doc, doc._darkPages);
     doc.end();
