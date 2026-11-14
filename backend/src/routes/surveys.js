@@ -72,10 +72,20 @@ router.post('/claim/:eventId', verifyToken, (req, res) => {
   }
 });
 
-router.get('/:code', (req, res) => {
+function requireAssignment(req, res, survey) {
+  const assigned = db.prepare(`SELECT 1 FROM event_users WHERE event_id = ? AND user_id = ?`).get(survey.event_id, req.user.id);
+  if (!assigned && req.user.role === 'USUARIO') {
+    res.status(403).json({ message: 'No está asignado a este evento' });
+    return false;
+  }
+  return true;
+}
+
+router.get('/:code', verifyToken, (req, res) => {
   const survey = getSurveyByCode(req.params.code.toUpperCase().trim());
   const error = validateSurvey(survey);
   if (error) return res.status(400).json({ message: error });
+  if (!requireAssignment(req, res, survey)) return;
 
   const questions = db.prepare(`
     SELECT id, number, section, text FROM questions
@@ -92,7 +102,7 @@ router.get('/:code', (req, res) => {
   });
 });
 
-router.post('/:code', [
+router.post('/:code', verifyToken, [
   body('answers').isArray({ min: 1 }).withMessage('Respuestas requeridas'),
 ], (req, res) => {
   const errors = validationResult(req);
@@ -101,6 +111,7 @@ router.post('/:code', [
   const survey = getSurveyByCode(req.params.code.toUpperCase().trim());
   const error = validateSurvey(survey);
   if (error) return res.status(400).json({ message: error });
+  if (!requireAssignment(req, res, survey)) return;
 
   const questions = db.prepare(`
     SELECT id, number FROM questions WHERE test_id = ? AND active = 1 ORDER BY number
