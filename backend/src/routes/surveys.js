@@ -3,10 +3,11 @@ const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const db = require('../db/database');
 const { calculateClimaScore } = require('../utils/scoring');
+const { verifyToken } = require('../middleware/auth');
 
 function getSurveyByCode(code) {
   return db.prepare(`
-    SELECT ac.id AS code_id, ac.code, ac.used,
+    SELECT ac.id AS code_id, ac.code, ac.used, ac.response_id,
            ev.id AS event_id, ev.name AS event_name, ev.active, ev.start_date, ev.end_date,
            ev.target_audience, ev.test_id,
            e.name AS entity_name,
@@ -24,7 +25,7 @@ function getSurveyByCode(code) {
 function validateSurvey(survey) {
   const today = new Date().toISOString().split('T')[0];
   if (!survey || survey.test_type !== 'CLIMA') return 'Código no válido';
-  if (survey.used) return 'Este código ya fue utilizado';
+  if (survey.response_id) return 'Este código ya fue utilizado';
   if (!survey.active) return 'El evento no está activo';
   if (today < survey.start_date || today > survey.end_date) {
     return 'El evento no está dentro del rango de fechas permitido';
@@ -34,6 +35,42 @@ function validateSurvey(survey) {
   }
   return null;
 }
+
+router.post('/claim/:eventId', verifyToken, (req, res) => {
+  const today = new Date().toISOString().split('T')[0];
+  const event = db.prepare(`
+    SELECT ev.*, t.test_type, lk.status AS license_status, lk.valid_from, lk.valid_to
+    FROM events ev
+    JOIN tests t ON ev.test_id = t.id
+    LEFT JOIN license_keys lk ON ev.license_key_id = lk.id
+    WHERE ev.id = ?
+  `).get(req.params.eventId);
+
+  if (!event || event.test_type !== 'CLIMA') return res.status(404).json({ message: 'Evento no encontrado' });
+  if (!event.active) return res.status(400).json({ message: 'El evento no está activo' });
+  if (today < event.start_date || today > event.end_date) {
+    return res.status(400).json({ message: 'El evento no está dentro del rango de fechas permitido' });
+  }
+  if (event.license_status !== 'activa' || today < event.valid_from || today > event.valid_to) {
+    return res.status(400).json({ message: 'El evento no tiene una licencia vigente' });
+  }
+  const assigned = db.prepare(`SELECT 1 FROM event_users WHERE event_id = ? AND user_id = ?`).get(event.id, req.user.id);
+  if (!assigned) return res.status(403).json({ message: 'No está asignado a este evento' });
+
+  const tx = db.transaction(() => {
+    const code = db.prepare(`SELECT id, code FROM access_codes WHERE event_id = ? AND used = 0 ORDER BY id LIMIT 1`).get(event.id);
+    if (!code) throw new Error('Ya no quedan formularios disponibles; la encuesta fue completada');
+    db.prepare(`UPDATE access_codes SET used = 1 WHERE id = ? AND used = 0`).run(code.id);
+    return code;
+  });
+
+  try {
+    const code = tx();
+    res.json({ code: code.code });
+  } catch (e) {
+    res.status(400).json({ message: e.message });
+  }
+});
 
 router.get('/:code', (req, res) => {
   const survey = getSurveyByCode(req.params.code.toUpperCase().trim());
@@ -81,7 +118,7 @@ router.post('/:code', [
   const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
 
   const tx = db.transaction(() => {
-    const stillUnused = db.prepare(`UPDATE access_codes SET used = 1 WHERE id = ? AND used = 0`).run(survey.code_id);
+    const stillUnused = db.prepare(`UPDATE access_codes SET used = 1 WHERE id = ? AND response_id IS NULL`).run(survey.code_id);
     if (stillUnused.changes === 0) throw new Error('Este código ya fue utilizado');
 
     const result = db.prepare(`

@@ -64,11 +64,12 @@ export default function EmpresaEvents() {
                     </TableCell>
                     <TableCell><Chip label={ev.active ? 'Activo' : 'Inactivo'} color={ev.active ? 'success' : 'default'} size="small" /></TableCell>
                     <TableCell align="center">
-                      {ev.test_type === 'CLIMA' ? (
+                      {ev.test_type === 'CLIMA' && (
                         <Tooltip title="Ver códigos de acceso">
                           <IconButton size="small" onClick={() => { setSelected(ev); setCodesDialogOpen(true); }}><QrCode fontSize="small" /></IconButton>
                         </Tooltip>
-                      ) : ev.active === 1 && (
+                      )}
+                      {ev.active === 1 && (
                         <Tooltip title="Asignar usuarios">
                           <IconButton size="small" onClick={() => { setSelected(ev); setDialogOpen(true); }}><People fontSize="small" /></IconButton>
                         </Tooltip>

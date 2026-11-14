@@ -47,6 +47,7 @@ export default function Dashboard() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [claiming, setClaiming] = useState(null);
 
   useEffect(() => {
     api.get('/events/user/available')
@@ -111,19 +112,51 @@ export default function Dashboard() {
                 <Box display="flex" gap={1} flexWrap="wrap" mt={1}>
                   <Chip icon={<CalendarToday fontSize="small" />} label={`${formatDate(event.start_date)} — ${formatDate(event.end_date)}`} size="small" variant="outlined" color="primary" />
                   <Chip icon={<VpnKey fontSize="small" />} label="Licencia válida" size="small" color="success" variant="outlined" />
+                  {event.test_type === 'CLIMA' && (
+                    <Chip label={`${event.codes_left} formulario${event.codes_left !== 1 ? 's' : ''} disponible${event.codes_left !== 1 ? 's' : ''}`} size="small" color={event.codes_left > 0 ? 'primary' : 'default'} variant="outlined" />
+                  )}
                 </Box>
               </CardContent>
 
               <CardActions sx={{ p: 2, pt: 0 }}>
-                <Button
-                  fullWidth
-                  variant="contained"
-                  startIcon={<PlayArrow />}
-                  onClick={() => navigate(`/test/${event.id}`)}
-                  sx={{ borderRadius: 2, fontWeight: 700, bgcolor: getPalette(event.test_type).button, '&:hover': { bgcolor: getPalette(event.test_type).button, filter: 'brightness(1.1)' } }}
-                >
-                  Iniciar Test
-                </Button>
+                {event.test_type === 'CLIMA' ? (
+                  event.codes_left > 0 ? (
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      startIcon={claiming === event.id ? <CircularProgress size={20} color="inherit" /> : <PlayArrow />}
+                      disabled={claiming !== null}
+                      onClick={async () => {
+                        setClaiming(event.id);
+                        setError('');
+                        try {
+                          const { data } = await api.post(`/surveys/claim/${event.id}`);
+                          navigate(`/encuesta/${data.code}`);
+                        } catch (e) {
+                          setError(e.response?.data?.message || 'No se pudo obtener un código de acceso');
+                          setClaiming(null);
+                        }
+                      }}
+                      sx={{ borderRadius: 2, fontWeight: 700, bgcolor: getPalette(event.test_type).button, '&:hover': { bgcolor: getPalette(event.test_type).button, filter: 'brightness(1.1)' } }}
+                    >
+                      Iniciar Test
+                    </Button>
+                  ) : (
+                    <Button fullWidth variant="outlined" disabled sx={{ borderRadius: 2, fontWeight: 700 }}>
+                      Encuesta completada
+                    </Button>
+                  )
+                ) : (
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    startIcon={<PlayArrow />}
+                    onClick={() => navigate(`/test/${event.id}`)}
+                    sx={{ borderRadius: 2, fontWeight: 700, bgcolor: getPalette(event.test_type).button, '&:hover': { bgcolor: getPalette(event.test_type).button, filter: 'brightness(1.1)' } }}
+                  >
+                    Iniciar Test
+                  </Button>
+                )}
               </CardActions>
             </Card>
           </Grid>

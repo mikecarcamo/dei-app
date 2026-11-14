@@ -195,7 +195,8 @@ router.get('/user/available', verifyToken, (req, res) => {
            t.name as test_name, t.description as test_description, t.test_type,
            e.name as entity_name,
            lk.key_value, lk.status as license_status,
-           (SELECT COUNT(*) FROM responses r WHERE r.event_id = ev.id AND r.annulled = 0) as response_count
+           (SELECT COUNT(*) FROM responses r WHERE r.event_id = ev.id AND r.annulled = 0) as response_count,
+           (SELECT COUNT(*) FROM access_codes ac WHERE ac.event_id = ev.id AND ac.used = 0) as codes_left
     FROM events ev
     JOIN entities e ON ev.entity_id = e.id
     JOIN tests t ON ev.test_id = t.id
