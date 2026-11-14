@@ -3,7 +3,7 @@ const router = express.Router();
 const PDFDocument = require('pdfkit');
 const db = require('../db/database');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
-const { generateIndividualPDF, generateConsolidatedPDF, appendDisclaimer, drawWatermark } = require('../utils/pdf');
+const { generateIndividualPDF, generateConsolidatedPDF, generateClimaConsolidatedPDF, generateClimaIndividualPDF, appendDisclaimer, drawWatermark } = require('../utils/pdf');
 
 function createDoc() {
   const doc = new PDFDocument({ margin: 40, size: 'LETTER', bufferPages: true });
@@ -77,7 +77,11 @@ router.get('/individual/:responseId', verifyToken, (req, res) => {
   const viewMode = req.query.view === 'true';
   res.setHeader('Content-Disposition', `${viewMode ? 'inline' : 'attachment'}; filename="resultado_${safeName}.pdf"`);
   doc.pipe(res);
-  generateIndividualPDF(doc, response, event, answers);
+  if (event.test_type === 'CLIMA') {
+    generateClimaIndividualPDF(doc, response, event, answers);
+  } else {
+    generateIndividualPDF(doc, response, event, answers);
+  }
   appendDisclaimer(doc);
   addPageNumbers(doc, doc._darkPages);
   doc.end();
@@ -105,6 +109,34 @@ router.get('/consolidated/:eventId', verifyToken, (req, res) => {
   const responses = db.prepare(`
     SELECT * FROM responses WHERE event_id = ? AND annulled = 0 ORDER BY participant_full_name COLLATE NOCASE ASC
   `).all(req.params.eventId);
+
+  if (event.test_type === 'CLIMA') {
+    const questions = db.prepare(`SELECT id, number, section, text, is_external FROM questions WHERE test_id = ? AND active = 1 ORDER BY number`).all(event.test_id);
+    const indicatorStats = questions.map(q => {
+      const avg = db.prepare(`
+        SELECT AVG(ra.numeric_value) AS m FROM response_answers ra
+        JOIN responses r ON ra.response_id = r.id
+        WHERE r.event_id = ? AND r.annulled = 0 AND ra.question_id = ?
+      `).get(req.params.eventId, q.id).m || 0;
+      return { number: q.number, section: q.section, text: q.text, is_external: q.is_external, pct: (avg / 5) * 100 };
+    });
+    const sections = [...new Set(indicatorStats.map(s => s.section))];
+    const factorStats = sections.map(sec => {
+      const items = indicatorStats.filter(s => s.section === sec);
+      return { section: sec, pct: items.reduce((a, b) => a + b.pct, 0) / items.length };
+    });
+    const doc = createDoc();
+    const safeName = (event.name || 'evento').replace(/[^a-zA-Z0-9_\-\s]/g, '').replace(/\s+/g, '_');
+    res.setHeader('Content-Type', 'application/pdf');
+    const viewMode = req.query.view === 'true';
+    res.setHeader('Content-Disposition', `${viewMode ? 'inline' : 'attachment'}; filename="consolidado_clima_${safeName}.pdf"`);
+    doc.pipe(res);
+    generateClimaConsolidatedPDF(doc, event, indicatorStats, factorStats, responses);
+    appendDisclaimer(doc);
+    addPageNumbers(doc, doc._darkPages);
+    doc.end();
+    return;
+  }
 
   const detailParam = req.query.detail;
   const includeDetail = detailParam === 'true' || detailParam === 'full';

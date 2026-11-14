@@ -7,6 +7,7 @@ import Layout from './components/Layout';
 
 import Login from './pages/Login';
 import ChangePassword from './pages/ChangePassword';
+import ClimaSurvey from './pages/ClimaSurvey';
 
 import Dashboard from './pages/user/Dashboard';
 import TestForm from './pages/user/TestForm';
@@ -61,6 +62,7 @@ export default function App() {
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/encuesta/:code" element={<ClimaSurvey />} />
 
             {/* Cambio de contraseña — cualquier usuario autenticado */}
             <Route element={<ProtectedRoute />}>

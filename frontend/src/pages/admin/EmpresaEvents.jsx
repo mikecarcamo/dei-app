@@ -3,14 +3,15 @@ import {
   Box, Typography, Card, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, IconButton, Chip, CircularProgress, Tooltip,
 } from '@mui/material';
-import { People, VpnKey } from '@mui/icons-material';
+import { People, VpnKey, QrCode } from '@mui/icons-material';
 import api from '../../api/axios';
-import { AssignUsersDialog } from './Events';
+import { AssignUsersDialog, CodesDialog } from './Events';
 
 export default function EmpresaEvents() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [codesDialogOpen, setCodesDialogOpen] = useState(false);
   const [selected, setSelected] = useState(null);
 
   const load = () => {
@@ -51,7 +52,10 @@ export default function EmpresaEvents() {
                 {events.map(ev => (
                   <TableRow key={ev.id} hover>
                     <TableCell fontWeight={600}>{ev.name}</TableCell>
-                    <TableCell sx={{ fontSize: 13 }}>{ev.test_name}</TableCell>
+                    <TableCell sx={{ fontSize: 13 }}>
+                      {ev.test_name}
+                      {ev.target_audience && <Typography variant="caption" display="block" color="text.secondary">→ {ev.target_audience}</Typography>}
+                    </TableCell>
                     <TableCell sx={{ fontSize: 12 }}>{ev.start_date} → {ev.end_date}</TableCell>
                     <TableCell>
                       {ev.key_value
@@ -60,7 +64,11 @@ export default function EmpresaEvents() {
                     </TableCell>
                     <TableCell><Chip label={ev.active ? 'Activo' : 'Inactivo'} color={ev.active ? 'success' : 'default'} size="small" /></TableCell>
                     <TableCell align="center">
-                      {ev.active === 1 && (
+                      {ev.test_type === 'CLIMA' ? (
+                        <Tooltip title="Ver códigos de acceso">
+                          <IconButton size="small" onClick={() => { setSelected(ev); setCodesDialogOpen(true); }}><QrCode fontSize="small" /></IconButton>
+                        </Tooltip>
+                      ) : ev.active === 1 && (
                         <Tooltip title="Asignar usuarios">
                           <IconButton size="small" onClick={() => { setSelected(ev); setDialogOpen(true); }}><People fontSize="small" /></IconButton>
                         </Tooltip>
@@ -81,6 +89,10 @@ export default function EmpresaEvents() {
         open={dialogOpen} event={selected}
         onClose={() => setDialogOpen(false)}
         onSaved={() => { setDialogOpen(false); load(); }}
+      />
+      <CodesDialog
+        open={codesDialogOpen} event={selected}
+        onClose={() => setCodesDialogOpen(false)}
       />
     </Box>
   );

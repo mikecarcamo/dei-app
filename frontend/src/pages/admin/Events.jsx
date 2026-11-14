@@ -6,7 +6,7 @@ import {
   MenuItem, Select, FormControl, InputLabel, Divider, List, ListItem,
   ListItemText, ListItemSecondaryAction, Checkbox,
 } from '@mui/material';
-import { Add, Edit, People, VpnKey } from '@mui/icons-material';
+import { Add, Edit, People, VpnKey, Lock, QrCode } from '@mui/icons-material';
 import api from '../../api/axios';
 
 function LicenseDialog({ open, entityId, entityName, onClose, onCreated }) {
@@ -55,8 +55,59 @@ function LicenseDialog({ open, entityId, entityName, onClose, onCreated }) {
   );
 }
 
+export function CodesDialog({ open, event, onClose }) {
+  const [codes, setCodes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!open || !event) return;
+    setLoading(true);
+    api.get(`/events/${event.id}/codes`)
+      .then(({ data }) => setCodes(data))
+      .finally(() => setLoading(false));
+  }, [open, event]);
+
+  const baseUrl = window.location.origin;
+  const copyAll = () => {
+    const text = codes.map(c => `${baseUrl}/encuesta/${c.code}`).join('\n');
+    navigator.clipboard.writeText(text).then(() => setCopied(true));
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Códigos de acceso — {event?.name}</DialogTitle>
+      <DialogContent>
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Comparta un enlace único a cada participante. Cada código solo puede usarse una vez.
+        </Alert>
+        <Button size="small" variant="outlined" onClick={copyAll} sx={{ mb: 2 }}>
+          {copied ? 'Enlaces copiados' : 'Copiar todos los enlaces'}
+        </Button>
+        {loading ? <CircularProgress /> : (
+          <List dense sx={{ maxHeight: 360, overflow: 'auto' }}>
+            {codes.map(c => (
+              <ListItem key={c.id} disablePadding>
+                <ListItemText
+                  primary={<Typography sx={{ fontFamily: 'monospace', fontSize: 14 }}>{c.code}</Typography>}
+                  secondary={`${baseUrl}/encuesta/${c.code}`}
+                  secondaryTypographyProps={{ fontSize: 11 }}
+                />
+                <Chip label={c.used ? 'Usado' : 'Disponible'} size="small" color={c.used ? 'default' : 'success'} />
+              </ListItem>
+            ))}
+          </List>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cerrar</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 function EventDialog({ open, event, entities, tests, licenses, onClose, onSaved }) {
-  const blank = { entity_id: '', test_id: '', name: '', active: true, license_key_id: '' };
+  const blank = { entity_id: '', test_id: '', name: '', active: true, license_key_id: '', target_audience: '', codes_count: '' };
   const [form, setForm] = useState(blank);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -71,6 +122,8 @@ function EventDialog({ open, event, entities, tests, licenses, onClose, onSaved 
         name: event.name || '',
         active: event.active === 1,
         license_key_id: event.license_key_id || '',
+        target_audience: event.target_audience || '',
+        codes_count: event.codes_count || '',
       });
     } else {
       setForm(blank);
@@ -87,6 +140,7 @@ function EventDialog({ open, event, entities, tests, licenses, onClose, onSaved 
   );
   const selectedLicense = allLicenses.find(lk => lk.id === form.license_key_id);
   const selectedEntityName = entities.find(e => e.id === form.entity_id)?.name || '';
+  const isClima = tests.find(t => t.id === form.test_id)?.test_type === 'CLIMA';
 
   const handleLicenseCreated = (license) => {
     setCreatedLicenses(prev => [...prev, license]);
@@ -99,9 +153,13 @@ function EventDialog({ open, event, entities, tests, licenses, onClose, onSaved 
       setError('Todos los campos obligatorios deben completarse');
       return;
     }
+    if (isClima && !event && (!form.target_audience.trim() || !form.codes_count || form.codes_count < 1)) {
+      setError('Para Clima Laboral indique la audiencia y la cantidad de códigos a generar');
+      return;
+    }
     setLoading(true);
     try {
-      const payload = { ...form, license_key_id: form.license_key_id };
+      const payload = { ...form, license_key_id: form.license_key_id, codes_count: isClima ? parseInt(form.codes_count) : undefined };
       if (event) {
         await api.put(`/events/${event.id}`, payload);
       } else {
@@ -133,6 +191,29 @@ function EventDialog({ open, event, entities, tests, licenses, onClose, onSaved 
             {tests.filter(t => t.active).map(t => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
           </Select>
         </FormControl>
+        {isClima && (
+          <Alert severity="info" sx={{ mt: 1 }} icon={<Lock fontSize="small" />}>
+            Encuesta anónima: los participantes responderán con un código único, sin identificarse.
+          </Alert>
+        )}
+        {isClima && !event && (
+          <>
+            <TextField
+              label="Dirigido a *" fullWidth margin="normal"
+              value={form.target_audience}
+              onChange={e => setForm(f => ({ ...f, target_audience: e.target.value }))}
+              placeholder="Ej: Gerencia, Jefes de Taller, Personal administrativo"
+              helperText="Se mostrará en la parte superior de la encuesta"
+            />
+            <TextField
+              label="Cantidad de códigos a generar *" type="number" fullWidth margin="normal"
+              value={form.codes_count}
+              onChange={e => setForm(f => ({ ...f, codes_count: e.target.value }))}
+              inputProps={{ min: 1, max: 1000 }}
+              helperText="Un código por participante; cada uno solo puede usarse una vez"
+            />
+          </>
+        )}
         {form.entity_id ? (
           <>
             <FormControl fullWidth margin="normal">
@@ -275,6 +356,7 @@ export default function Events() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [usersDialogOpen, setUsersDialogOpen] = useState(false);
+  const [codesDialogOpen, setCodesDialogOpen] = useState(false);
   const [selected, setSelected] = useState(null);
 
   const load = () => {
@@ -328,7 +410,10 @@ export default function Events() {
                   <TableRow key={ev.id} hover>
                     <TableCell fontWeight={600}>{ev.name}</TableCell>
                     <TableCell sx={{ fontSize: 13 }}>{ev.entity_name}</TableCell>
-                    <TableCell sx={{ fontSize: 13 }}>{ev.test_name}</TableCell>
+                    <TableCell sx={{ fontSize: 13 }}>
+                      {ev.test_name}
+                      {ev.target_audience && <Typography variant="caption" display="block" color="text.secondary">→ {ev.target_audience}</Typography>}
+                    </TableCell>
                     <TableCell sx={{ fontSize: 12 }}>{ev.start_date} → {ev.end_date}</TableCell>
                     <TableCell>
                       {ev.key_value
@@ -340,9 +425,15 @@ export default function Events() {
                       <Tooltip title="Editar evento">
                         <IconButton size="small" onClick={() => { setSelected(ev); setDialogOpen(true); }}><Edit fontSize="small" /></IconButton>
                       </Tooltip>
-                      <Tooltip title="Asignar usuarios">
-                        <IconButton size="small" onClick={() => { setSelected(ev); setUsersDialogOpen(true); }}><People fontSize="small" /></IconButton>
-                      </Tooltip>
+                      {ev.test_type === 'CLIMA' ? (
+                        <Tooltip title="Ver códigos de acceso">
+                          <IconButton size="small" onClick={() => { setSelected(ev); setCodesDialogOpen(true); }}><QrCode fontSize="small" /></IconButton>
+                        </Tooltip>
+                      ) : (
+                        <Tooltip title="Asignar usuarios">
+                          <IconButton size="small" onClick={() => { setSelected(ev); setUsersDialogOpen(true); }}><People fontSize="small" /></IconButton>
+                        </Tooltip>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -365,6 +456,10 @@ export default function Events() {
         open={usersDialogOpen} event={selected}
         onClose={() => setUsersDialogOpen(false)}
         onSaved={() => { setUsersDialogOpen(false); load(); }}
+      />
+      <CodesDialog
+        open={codesDialogOpen} event={selected}
+        onClose={() => setCodesDialogOpen(false)}
       />
     </Box>
   );

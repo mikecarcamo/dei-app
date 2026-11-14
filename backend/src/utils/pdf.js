@@ -562,4 +562,108 @@ function generateConsolidatedPDF(doc, event, responses, includeDetail = false, i
 
 }
 
-module.exports = { generateIndividualPDF, generateConsolidatedPDF, appendDisclaimer, drawWatermark };
+const CLIMA_COLORS = { fortaleza: '#2E7D32', oportunidad: '#1565C0', amenaza: '#C62828', debilidad: '#FF6F00' };
+const CLIMA_SCALE = { 5: 'Totalmente de acuerdo', 4: 'De acuerdo', 3: 'Ni de acuerdo ni en desacuerdo', 2: 'En desacuerdo', 1: 'Totalmente en desacuerdo' };
+
+function classifyClima(pct, isExternal) {
+  if (pct >= 80) return { tipo: 'Fortaleza', color: CLIMA_COLORS.fortaleza };
+  if (pct >= 66) return { tipo: 'Oportunidad', color: CLIMA_COLORS.oportunidad };
+  return isExternal ? { tipo: 'Amenaza', color: CLIMA_COLORS.amenaza } : { tipo: 'Debilidad', color: CLIMA_COLORS.debilidad };
+}
+
+function generateClimaConsolidatedPDF(doc, event, indicatorStats, factorStats, responses) {
+  markDarkPage(doc);
+  doc.rect(0, 0, doc.page.width, 90).fill(COLORS.success);
+  doc.fillColor(COLORS.white).fontSize(20).font('Helvetica-Bold')
+    .text('Reporte Consolidado - Clima Laboral', 40, 22, { align: 'center' });
+  doc.fontSize(11).font('Helvetica')
+    .text(event.name, 40, 56, { align: 'center', width: doc.page.width - 80 });
+  doc.fillColor(COLORS.text);
+  let y = 110;
+
+  y = drawEventDataSection(doc, y, event, responses, COLORS.success);
+  if (event.target_audience) y = drawSection(doc, y, 'Dirigido a:', event.target_audience);
+  y = drawSection(doc, y, 'Modalidad:', 'Anónima (códigos únicos)');
+  y += 10;
+
+  doc.fontSize(13).font('Helvetica-Bold').fillColor(COLORS.success).text('RESUMEN POR FACTOR', 40, y);
+  y += 20;
+  for (const f of factorStats) {
+    y = drawScoreBar(doc, y, `${f.section} (${f.pct.toFixed(1)}%):`, Math.round(f.pct), 100, COLORS.success);
+  }
+  y += 10;
+  doc.rect(40, y, doc.page.width - 80, 1).fill(COLORS.border);
+  y += 15;
+
+  doc.fontSize(13).font('Helvetica-Bold').fillColor(COLORS.success).text('CLASIFICACIÓN DE INDICADORES', 40, y);
+  y += 18;
+  const counts = { Fortaleza: 0, Oportunidad: 0, Amenaza: 0, Debilidad: 0 };
+  const classified = indicatorStats.map(s => ({ ...s, ...classifyClima(s.pct, s.is_external) }));
+  classified.forEach(c => counts[c.tipo]++);
+  const legend = [['Fortalezas', 'Fortaleza'], ['Oportunidades', 'Oportunidad'], ['Amenazas', 'Amenaza'], ['Debilidades', 'Debilidad']];
+  for (const [label, key] of legend) {
+    const color = classified.find(c => c.tipo === key)?.color || COLORS.text;
+    doc.fontSize(10).font('Helvetica-Bold').fillColor(color).text(`${label}: ${counts[key]} indicadores`, 50, y);
+    y += 15;
+  }
+  y += 10;
+
+  const colW = [30, 300, 60, 90];
+  const colX = [40, 70, 380, 450];
+  const hdrs = ['#', 'Indicador', 'Pond. %', 'Tipo'];
+
+  doc.rect(40, y, doc.page.width - 80, 20).fill(COLORS.success);
+  doc.fillColor(COLORS.white).fontSize(9).font('Helvetica-Bold');
+  hdrs.forEach((h, i) => doc.text(h, colX[i], y + 5, { width: colW[i] }));
+  y += 22;
+
+  let currentSection = '';
+  for (const s of classified) {
+    if (s.section !== currentSection) {
+      currentSection = s.section;
+      if (y > doc.page.height - 100) { doc.addPage(); y = 50; }
+      doc.fontSize(10).font('Helvetica-Bold').fillColor(COLORS.primary).text(currentSection, 40, y);
+      y += 15;
+    }
+    if (y > doc.page.height - 80) { doc.addPage(); y = 50; }
+    doc.fillColor(COLORS.text).fontSize(8).font('Helvetica');
+    doc.text(String(s.number), colX[0], y + 3, { width: colW[0] });
+    doc.text(s.text, colX[1], y + 3, { width: colW[1] });
+    doc.font('Helvetica-Bold').text(`${s.pct.toFixed(1)}%`, colX[2], y + 3, { width: colW[2] });
+    doc.fillColor(s.color).text(s.tipo.toUpperCase(), colX[3], y + 3, { width: colW[3] });
+    y += Math.max(14, doc.heightOfString(s.text, { width: colW[1] }) + 6);
+  }
+}
+
+function generateClimaIndividualPDF(doc, response, event, answers) {
+  let y = drawHeader(doc, 'Comprobante de Participación — Clima Laboral', event.name);
+  y = drawSection(doc, y, 'Evento:', event.name);
+  y = drawSection(doc, y, 'Entidad:', event.entity_name || '—');
+  if (event.target_audience) y = drawSection(doc, y, 'Dirigido a:', event.target_audience);
+  y = drawSection(doc, y, 'Código de participación:', response.participant_full_name);
+  y = drawSection(doc, y, 'Ponderación general:', `${(response.clima_score || 0).toFixed(2)}%`);
+  const fecha = response.submitted_at ? new Date(response.submitted_at.replace(' ', 'T')).toLocaleString('es-GT', { dateStyle: 'long', timeStyle: 'short' }) : '—';
+  y = drawSection(doc, y, 'Fecha:', fecha);
+  y += 5;
+  doc.fontSize(10).font('Helvetica-Oblique').fillColor(COLORS.muted)
+    .text('Esta encuesta es anónima. El código identifica el formulario sin revelar la identidad del participante.', 40, y, { width: doc.page.width - 80 });
+  y += 30;
+
+  let section = '';
+  for (const ans of answers) {
+    if (ans.section !== section) {
+      section = ans.section;
+      if (y > doc.page.height - 100) { doc.addPage(); y = 50; }
+      doc.fontSize(11).font('Helvetica-Bold').fillColor(COLORS.primary).text(section, 40, y);
+      y += 18;
+    }
+    if (y > doc.page.height - 80) { doc.addPage(); y = 50; }
+    doc.fontSize(9).font('Helvetica-Bold').fillColor(COLORS.secondary).text(`${ans.number}.`, 42, y, { width: 25 });
+    doc.fontSize(9).font('Helvetica').fillColor(COLORS.text).text(ans.question_text, 68, y, { width: 320 });
+    const val = ans.numeric_value;
+    doc.fontSize(9).font('Helvetica-Bold').fillColor(COLORS.primary).text(`${val} — ${CLIMA_SCALE[val] || '—'}`, 400, y, { width: 160 });
+    y += Math.max(18, doc.heightOfString(ans.question_text, { width: 320 }) + 6);
+  }
+}
+
+module.exports = { generateIndividualPDF, generateConsolidatedPDF, generateClimaConsolidatedPDF, generateClimaIndividualPDF, appendDisclaimer, drawWatermark };

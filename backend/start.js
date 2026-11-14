@@ -25,8 +25,9 @@ if (!fs.existsSync(resolvedDb) && fs.existsSync(seedDb)) {
 require('./src/db/migrate');
 require('./src/db/migrate_burnout');
 require('./src/db/migrate_response_answers');
+require('./src/db/migrate_clima');
 
-const seeds = ['./src/db/seed', './src/db/seed_burnout'];
+const seeds = ['./src/db/seed', './src/db/seed_burnout', './src/db/seed_clima'];
 for (const s of seeds) {
   try { require(s); } catch (e) { console.error(`Seed error (${s}):`, e.message); }
 }

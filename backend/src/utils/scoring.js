@@ -168,4 +168,10 @@ function calculateBurnout(answers, questions) {
   return { burnout_ce: ce, burnout_dp: dp, burnout_rp: rp, burnout_ce_nivel: ceNivel, burnout_dp_nivel: dpNivel, burnout_rp_nivel: rpNivel, burnout_diagnostico: diagnostico };
 }
 
-module.exports = { calculateTemperament, calculateBurnout, TEMPERAMENT_LABELS, TEMPERAMENT_MAP, BURNOUT_RANGOS };
+function calculateClimaScore(answers) {
+  if (!answers.length) return 0;
+  const total = answers.reduce((sum, a) => sum + (a.numeric_value || 0), 0);
+  return (total / (answers.length * 5)) * 100;
+}
+
+module.exports = { calculateTemperament, calculateBurnout, calculateClimaScore, TEMPERAMENT_LABELS, TEMPERAMENT_MAP, BURNOUT_RANGOS };

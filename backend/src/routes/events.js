@@ -3,6 +3,16 @@ const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const db = require('../db/database');
 const { verifyToken, requireAdmin, requireRole } = require('../middleware/auth');
+const { randomBytes } = require('crypto');
+
+function generateCode() {
+  return 'CLI-' + randomBytes(3).toString('hex').toUpperCase();
+}
+
+function createCodes(eventId, count) {
+  const insert = db.prepare(`INSERT INTO access_codes (event_id, code) VALUES (?, ?)`);
+  for (let i = 0; i < count; i++) insert.run(eventId, generateCode());
+}
 
 function getEventFull(id) {
   const event = db.prepare(`
@@ -68,7 +78,7 @@ router.post('/', verifyToken, requireAdmin, [
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-  const { entity_id, test_id, name, active, license_key_id } = req.body;
+  const { entity_id, test_id, name, active, license_key_id, target_audience, codes_count } = req.body;
 
   const key = db.prepare(`SELECT * FROM license_keys WHERE id = ?`).get(license_key_id);
   if (!key) return res.status(400).json({ message: 'Licencia no encontrada' });
@@ -76,12 +86,25 @@ router.post('/', verifyToken, requireAdmin, [
   if (key.status !== 'activa') return res.status(400).json({ message: 'La licencia no está activa' });
   if (key.entity_id !== parseInt(entity_id)) return res.status(400).json({ message: 'La licencia no pertenece a esa entidad' });
 
+  const testRow = db.prepare(`SELECT test_type FROM tests WHERE id = ?`).get(test_id);
+  const isClima = testRow && testRow.test_type === 'CLIMA';
+  if (isClima) {
+    if (!target_audience || !target_audience.trim()) {
+      return res.status(400).json({ message: 'Indique a quién va dirigida la encuesta (ej: Gerencia)' });
+    }
+    if (!codes_count || codes_count < 1 || codes_count > 1000) {
+      return res.status(400).json({ message: 'Indique cuántos códigos de acceso generar (1-1000)' });
+    }
+  }
+
   const result = db.prepare(`
-    INSERT INTO events (entity_id, test_id, name, start_date, end_date, active, license_key_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(entity_id, test_id, name.trim(), key.valid_from, key.valid_to, active !== false ? 1 : 0, license_key_id);
+    INSERT INTO events (entity_id, test_id, name, start_date, end_date, active, license_key_id, target_audience, codes_count)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(entity_id, test_id, name.trim(), key.valid_from, key.valid_to, active !== false ? 1 : 0, license_key_id,
+    isClima ? target_audience.trim() : null, isClima ? codes_count : 0);
 
   db.prepare(`UPDATE license_keys SET event_id = ? WHERE id = ?`).run(result.lastInsertRowid, license_key_id);
+  if (isClima) createCodes(result.lastInsertRowid, codes_count);
 
   res.status(201).json(getEventFull(result.lastInsertRowid));
 });
@@ -190,6 +213,16 @@ router.get('/user/available', verifyToken, (req, res) => {
   `).all(entityId, userId, today, today, today, today);
 
   res.json(events);
+});
+
+router.get('/:id/codes', verifyToken, requireRole('ADMIN', 'EMPRESA'), (req, res) => {
+  const event = db.prepare(`SELECT * FROM events WHERE id = ?`).get(req.params.id);
+  if (!event) return res.status(404).json({ message: 'Evento no encontrado' });
+  if (req.user.role === 'EMPRESA' && event.entity_id !== req.user.entity_id) {
+    return res.status(403).json({ message: 'Sin acceso a este evento' });
+  }
+  const codes = db.prepare(`SELECT id, code, used, created_at FROM access_codes WHERE event_id = ? ORDER BY id`).all(req.params.id);
+  res.json(codes);
 });
 
 module.exports = router;
