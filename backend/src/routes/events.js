@@ -4,6 +4,7 @@ const { body, validationResult } = require('express-validator');
 const db = require('../db/database');
 const { verifyToken, requireAdmin, requireRole } = require('../middleware/auth');
 const { randomBytes } = require('crypto');
+const { todayGT } = require('../utils/dates');
 
 function generateCode() {
   return 'CLI-' + randomBytes(3).toString('hex').toUpperCase();
@@ -199,7 +200,7 @@ router.delete('/:id/users/:uid', verifyToken, requireRole('ADMIN', 'EMPRESA'), (
 });
 
 router.get('/user/available', verifyToken, (req, res) => {
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayGT();
   const userId = req.user.id;
   const entityId = req.user.entity_id;
 

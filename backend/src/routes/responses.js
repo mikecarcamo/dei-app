@@ -4,6 +4,7 @@ const { body, validationResult } = require('express-validator');
 const db = require('../db/database');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
 const { calculateTemperament, calculateBurnout } = require('../utils/scoring');
+const { todayGT, timestampGT } = require('../utils/dates');
 
 router.get('/my-events', verifyToken, (req, res) => {
   const { role, entity_id, id: userId } = req.user;
@@ -111,7 +112,7 @@ router.post('/', verifyToken, [
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
   const { event_id, participant_full_name, answers } = req.body;
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayGT();
 
   const event = db.prepare(`
     SELECT ev.*, lk.status as license_status, lk.valid_from, lk.valid_to
@@ -161,7 +162,7 @@ router.post('/', verifyToken, [
     const answersWithQ = answers.map(a => ({ ...a, numeric_value: a.numeric_value ?? 0 }));
     const scoring = calculateBurnout(answersWithQ, questions);
 
-    const nowBurnout = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    const nowBurnout = timestampGT();
     const insertResponse = db.prepare(`
       INSERT INTO responses (event_id, test_id, user_id, participant_full_name, score_a, score_b, score_c, score_d,
         burnout_ce, burnout_dp, burnout_rp, burnout_ce_nivel, burnout_dp_nivel, burnout_rp_nivel, burnout_diagnostico, conclusion, submitted_at)
@@ -191,7 +192,7 @@ router.post('/', verifyToken, [
 
   const scoring = calculateTemperament(answersWithQuestions, questions);
 
-  const nowTemp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+  const nowTemp = timestampGT();
   const insertResponse = db.prepare(`
     INSERT INTO responses (event_id, test_id, user_id, participant_full_name, score_a, score_b, score_c, score_d, dominant_temperament, secondary_temperament, conclusion, submitted_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)

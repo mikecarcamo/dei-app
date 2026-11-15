@@ -4,6 +4,7 @@ const { body, validationResult } = require('express-validator');
 const db = require('../db/database');
 const { calculateClimaScore } = require('../utils/scoring');
 const { verifyToken } = require('../middleware/auth');
+const { todayGT, timestampGT } = require('../utils/dates');
 
 function getSurveyByCode(code) {
   return db.prepare(`
@@ -23,7 +24,7 @@ function getSurveyByCode(code) {
 }
 
 function validateSurvey(survey) {
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayGT();
   if (!survey || survey.test_type !== 'CLIMA') return 'Código no válido';
   if (survey.response_id) return 'Este código ya fue utilizado';
   if (!survey.active) return 'El evento no está activo';
@@ -37,7 +38,7 @@ function validateSurvey(survey) {
 }
 
 router.post('/claim/:eventId', verifyToken, (req, res) => {
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayGT();
   const event = db.prepare(`
     SELECT ev.*, t.test_type, lk.status AS license_status, lk.valid_from, lk.valid_to
     FROM events ev
@@ -126,7 +127,7 @@ router.post('/:code', verifyToken, [
   }
 
   const score = calculateClimaScore(answers);
-  const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+  const now = timestampGT();
 
   const tx = db.transaction(() => {
     const stillUnused = db.prepare(`UPDATE access_codes SET used = 1 WHERE id = ? AND response_id IS NULL`).run(survey.code_id);
