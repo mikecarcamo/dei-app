@@ -69,7 +69,9 @@ Reglas:
         model: GROQ_MODEL,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.4,
-        max_tokens: 1400,
+        max_tokens: 6000,
+        reasoning_effort: 'low',
+        include_reasoning: false,
       }),
       signal: controller.signal,
     });
@@ -139,7 +141,9 @@ Reglas:
         model: GROQ_MODEL,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.4,
-        max_tokens: 1400,
+        max_tokens: 6000,
+        reasoning_effort: 'low',
+        include_reasoning: false,
       }),
       signal: controller.signal,
     });
