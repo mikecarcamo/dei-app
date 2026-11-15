@@ -4,7 +4,7 @@ const PDFDocument = require('pdfkit');
 const db = require('../db/database');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
 const { generateIndividualPDF, generateConsolidatedPDF, generateClimaConsolidatedPDF, generateClimaIndividualPDF, appendDisclaimer, drawWatermark } = require('../utils/pdf');
-const { generateClimaAnalysis } = require('../utils/ai');
+const { generateClimaAnalysis, generateClinicalAnalysis } = require('../utils/ai');
 
 function createDoc() {
   const doc = new PDFDocument({ margin: 40, size: 'LETTER', bufferPages: true });
@@ -189,13 +189,17 @@ router.get('/consolidated/:eventId', verifyToken, async (req, res) => {
     });
   }
 
+  const aiAnalysis = responses.length > 0
+    ? await generateClinicalAnalysis(event, event.test_type, responses)
+    : null;
+
   const doc = createDoc();
   const safeName = (event.name || 'evento').replace(/[^a-zA-Z0-9_\-\s]/g, '').replace(/\s+/g, '_');
   res.setHeader('Content-Type', 'application/pdf');
   const viewMode = req.query.view === 'true';
   res.setHeader('Content-Disposition', `${viewMode ? 'inline' : 'attachment'}; filename="consolidado_${safeName}.pdf"`);
   doc.pipe(res);
-  generateConsolidatedPDF(doc, event, responsesWithAnswers, includeDetail, includeAnswers);
+  generateConsolidatedPDF(doc, event, responsesWithAnswers, includeDetail, includeAnswers, aiAnalysis);
   appendDisclaimer(doc);
   addPageNumbers(doc, doc._darkPages);
   doc.end();

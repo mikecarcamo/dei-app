@@ -359,7 +359,36 @@ function drawAnswersDetail(doc, ay, answers) {
   return ay;
 }
 
-function generateConsolidatedPDF(doc, event, responses, includeDetail = false, includeAnswers = false) {
+function drawAIAnalysisPage(doc, aiAnalysis, accentColor) {
+  doc.addPage();
+  markDarkPage(doc);
+  let y = 50;
+  doc.fontSize(13).font('Helvetica-Bold').fillColor(accentColor).text('ANÁLISIS', 40, y);
+  y += 22;
+  const cleanText = aiAnalysis.replace(/\*\*/g, '').replace(/^#+\s*/gm, '').replace(/^[-•]\s*/gm, '');
+  for (const block of cleanText.split(/\n{2,}/)) {
+    const trimmed = block.trim();
+    if (!trimmed) continue;
+    const isHeader = trimmed === trimmed.toUpperCase() && trimmed.length < 70 && !/[.]$/.test(trimmed);
+    if (isHeader) {
+      if (y > doc.page.height - 120) { doc.addPage(); markDarkPage(doc); y = 50; }
+      y += 6;
+      doc.fontSize(11).font('Helvetica-Bold').fillColor(accentColor).text(trimmed.replace(/:$/, ''), 40, y);
+      y += 16;
+    } else {
+      doc.fontSize(10).font('Helvetica').fillColor(COLORS.text);
+      const h = doc.heightOfString(trimmed, { width: doc.page.width - 80 });
+      if (y + h > doc.page.height - 60) { doc.addPage(); markDarkPage(doc); y = 50; }
+      doc.text(trimmed, 40, y, { width: doc.page.width - 80, align: 'justify' });
+      y += h + 8;
+    }
+  }
+  y += 6;
+  if (y > doc.page.height - 160) { doc.addPage(); markDarkPage(doc); y = 50; }
+  drawSignature(doc, y);
+}
+
+function generateConsolidatedPDF(doc, event, responses, includeDetail = false, includeAnswers = false, aiAnalysis = null) {
   const isBurnout = event.test_type === 'BURNOUT';
 
   if (isBurnout) {
@@ -396,9 +425,16 @@ function generateConsolidatedPDF(doc, event, responses, includeDetail = false, i
       y = drawScoreBar(doc, y, s.label + ':', s.count, total, s.color);
     }
 
-    y += 10;
-    doc.rect(40, y, doc.page.width - 80, 1).fill(COLORS.burnoutBorder);
-    y += 15;
+    if (aiAnalysis) {
+      drawAIAnalysisPage(doc, aiAnalysis, COLORS.burnout);
+      doc.addPage();
+      markDarkPage(doc);
+      y = 50;
+    } else {
+      y += 10;
+      doc.rect(40, y, doc.page.width - 80, 1).fill(COLORS.burnoutBorder);
+      y += 15;
+    }
 
     doc.fontSize(13).font('Helvetica-Bold').fillColor(COLORS.burnout).text('LISTADO DE PARTICIPANTES', 40, y);
     y += 20;
@@ -500,9 +536,16 @@ function generateConsolidatedPDF(doc, event, responses, includeDetail = false, i
   y = drawScoreBar(doc, y, 'Flemático:', tempCounts.FLEMATICO, total, '#66BB6A');
   if (tempCounts.EMPATE > 0) y = drawScoreBar(doc, y, 'Empate:', tempCounts.EMPATE, total, '#FFA726');
 
-  y += 10;
-  doc.rect(40, y, doc.page.width - 80, 1).fill(COLORS.border);
-  y += 15;
+  if (aiAnalysis) {
+    drawAIAnalysisPage(doc, aiAnalysis, COLORS.primary);
+    doc.addPage();
+    markDarkPage(doc);
+    y = 50;
+  } else {
+    y += 10;
+    doc.rect(40, y, doc.page.width - 80, 1).fill(COLORS.border);
+    y += 15;
+  }
 
   doc.fontSize(13).font('Helvetica-Bold').fillColor(COLORS.primary).text('LISTADO DE PARTICIPANTES', 40, y);
   y += 20;
@@ -647,33 +690,7 @@ function generateClimaConsolidatedPDF(doc, event, indicatorStats, factorStats, r
   y = drawSignature(doc, y);
 
   if (aiAnalysis) {
-    doc.addPage();
-    markDarkPage(doc);
-    y = 50;
-    doc.fontSize(13).font('Helvetica-Bold').fillColor(COLORS.success).text('ANÁLISIS', 40, y);
-    y += 22;
-    const cleanText = aiAnalysis.replace(/\*\*/g, '').replace(/^#+\s*/gm, '').replace(/^[-•]\s*/gm, '');
-    const HEADERS = ['RESUMEN EJECUTIVO', 'FORTALEZAS', 'ÁREAS DE OPORTUNIDAD', 'AMENAZAS EXTERNAS', 'RECOMENDACIONES'];
-    for (const block of cleanText.split(/\n{2,}/)) {
-      const trimmed = block.trim();
-      if (!trimmed) continue;
-      const isHeader = HEADERS.includes(trimmed.replace(/:$/, ''));
-      if (isHeader) {
-        if (y > doc.page.height - 120) { doc.addPage(); markDarkPage(doc); y = 50; }
-        y += 6;
-        doc.fontSize(11).font('Helvetica-Bold').fillColor(COLORS.success).text(trimmed.replace(/:$/, ''), 40, y);
-        y += 16;
-      } else {
-        doc.fontSize(10).font('Helvetica').fillColor(COLORS.text);
-        const h = doc.heightOfString(trimmed, { width: doc.page.width - 80 });
-        if (y + h > doc.page.height - 60) { doc.addPage(); markDarkPage(doc); y = 50; }
-        doc.text(trimmed, 40, y, { width: doc.page.width - 80, align: 'justify' });
-        y += h + 8;
-      }
-    }
-    y += 6;
-    if (y > doc.page.height - 160) { doc.addPage(); markDarkPage(doc); y = 50; }
-    drawSignature(doc, y);
+    drawAIAnalysisPage(doc, aiAnalysis, COLORS.success);
   }
 
   doc.addPage();
