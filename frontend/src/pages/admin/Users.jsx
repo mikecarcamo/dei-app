@@ -18,7 +18,9 @@ function generatePassword() {
 }
 
 function UserDialog({ open, user, entities, isEmpresa, onClose, onSaved }) {
-  const blank = { full_name: '', email: '', password: '', role: 'USUARIO', entity_id: '', active: true, must_change_password: true };
+  const today = new Date().toISOString().slice(0, 10);
+  const nextYear = new Date(Date.now() + 365 * 864e5).toISOString().slice(0, 10);
+  const blank = { full_name: '', email: '', password: '', role: 'USUARIO', entity_id: '', active: true, must_change_password: true, license_from: today, license_to: nextYear };
   const [form, setForm] = useState(blank);
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -41,11 +43,26 @@ function UserDialog({ open, user, entities, isEmpresa, onClose, onSaved }) {
       const payload = isEmpresa
         ? { ...form, role: 'USUARIO', entity_id: undefined }
         : { ...form, entity_id: form.entity_id || null };
+      if (payload.role === 'TERAPEUTA' && (!payload.license_from || !payload.license_to)) {
+        setError('Ingrese la vigencia de la licencia del terapeuta'); setLoading(false); return;
+      }
+      if (payload.role === 'TERAPEUTA' && payload.license_to < payload.license_from) {
+        setError('La fecha de fin de licencia debe ser posterior al inicio'); setLoading(false); return;
+      }
+      let userId = user?.id;
       if (user) {
         if (!payload.password) delete payload.password;
         await api.put(`/users/${user.id}`, payload);
       } else {
-        await api.post('/users', payload);
+        const res = await api.post('/users', payload);
+        userId = res.data.id;
+      }
+      if (payload.role === 'TERAPEUTA' && (!user || user.role !== 'TERAPEUTA')) {
+        try {
+          await api.post(`/therapy/admin/therapists/${userId}/licenses`, { valid_from: payload.license_from, valid_to: payload.license_to });
+        } catch (le) {
+          alert(`Usuario guardado, pero la licencia no se pudo crear: ${le.response?.data?.message || le.message}. Asígnala en Entidades → Terapeutas.`);
+        }
       }
       onSaved();
     } catch (e) {
@@ -92,10 +109,17 @@ function UserDialog({ open, user, entities, isEmpresa, onClose, onSaved }) {
               </Select>
             </FormControl>
             {form.role === 'TERAPEUTA' && (
-              <Alert severity="info" sx={{ mt: 1 }}>
-                Los terapeutas requieren una licencia para usar el módulo de tamizaje.
-                Asígnala en <b>Entidades → Terapeutas</b>.
-              </Alert>
+              <>
+                <Alert severity="info" sx={{ mt: 1 }}>
+                  Vigencia de la licencia de tamizaje del terapeuta:
+                </Alert>
+                <Box display="flex" gap={2}>
+                  <TextField label="Licencia desde *" type="date" fullWidth margin="normal" InputLabelProps={{ shrink: true }}
+                    value={form.license_from} onChange={e => setForm(f => ({ ...f, license_from: e.target.value }))} />
+                  <TextField label="Licencia hasta *" type="date" fullWidth margin="normal" InputLabelProps={{ shrink: true }}
+                    value={form.license_to} onChange={e => setForm(f => ({ ...f, license_to: e.target.value }))} />
+                </Box>
+              </>
             )}
             <FormControl fullWidth margin="normal">
               <InputLabel>Entidad</InputLabel>
