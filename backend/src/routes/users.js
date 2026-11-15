@@ -44,7 +44,7 @@ router.post('/', verifyToken, requireRole('ADMIN', 'EMPRESA'), [
   body('full_name').notEmpty().trim().withMessage('Nombre completo requerido'),
   body('email').isEmail().withMessage('Email inválido'),
   body('password').isLength({ min: 8 }).withMessage('La contraseña debe tener al menos 8 caracteres'),
-  body('role').isIn(['ADMIN', 'EMPRESA', 'USUARIO']).withMessage('Rol inválido'),
+  body('role').isIn(['ADMIN', 'EMPRESA', 'USUARIO', 'TERAPEUTA']).withMessage('Rol inválido'),
 ], (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
@@ -84,6 +84,9 @@ router.put('/:id', verifyToken, requireAdmin, (req, res) => {
   if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
 
   const { full_name, email, role, entity_id, active, must_change_password, password } = req.body;
+  if (role && !['ADMIN', 'EMPRESA', 'USUARIO', 'TERAPEUTA'].includes(role)) {
+    return res.status(400).json({ message: 'Rol inválido' });
+  }
 
   let passwordHash = user.password_hash;
   if (password && password.length >= 8) {

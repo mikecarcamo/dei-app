@@ -9,8 +9,8 @@ import { Add, Edit, Visibility, VisibilityOff, Refresh } from '@mui/icons-materi
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 
-const ROLES = ['ADMIN', 'EMPRESA', 'USUARIO'];
-const ROLE_COLORS = { ADMIN: 'error', EMPRESA: 'warning', USUARIO: 'primary' };
+const ROLES = ['ADMIN', 'EMPRESA', 'USUARIO', 'TERAPEUTA'];
+const ROLE_COLORS = { ADMIN: 'error', EMPRESA: 'warning', USUARIO: 'primary', TERAPEUTA: 'success' };
 
 function generatePassword() {
   const c = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$';
@@ -91,6 +91,12 @@ function UserDialog({ open, user, entities, isEmpresa, onClose, onSaved }) {
                 {ROLES.map(r => <MenuItem key={r} value={r}>{r}</MenuItem>)}
               </Select>
             </FormControl>
+            {form.role === 'TERAPEUTA' && (
+              <Alert severity="info" sx={{ mt: 1 }}>
+                Los terapeutas requieren una licencia para usar el módulo de tamizaje.
+                Asígnala en <b>Entidades → Terapeutas</b>.
+              </Alert>
+            )}
             <FormControl fullWidth margin="normal">
               <InputLabel>Entidad</InputLabel>
               <Select value={form.entity_id} label="Entidad" onChange={e => setForm(f => ({ ...f, entity_id: e.target.value }))}>
