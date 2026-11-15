@@ -96,9 +96,9 @@ async function generateClinicalAnalysis(event, testType, responses) {
   let resultsText;
   let instrumentDesc;
   if (testType === 'BURNOUT') {
-    instrumentDesc = 'Cuestionario Burnout MBI (Maslach Burnout Inventory) con subescalas: Cansancio Emocional (CE, riesgo si nivel ALTO), Despersonalización (DP, riesgo si ALTO) y Realización Personal (RP, riesgo si BAJO).';
+    instrumentDesc = 'Cuestionario Burnout MBI (Maslach Burnout Inventory) con subescalas: Cansancio Emocional (riesgo si nivel ALTO), Despersonalización (riesgo si ALTO) y Realización Personal (riesgo si BAJO).';
     resultsText = responses.map(r =>
-      `- ${r.participant_full_name}: CE ${r.burnout_ce ?? '—'} (${r.burnout_ce_nivel || '—'}), DP ${r.burnout_dp ?? '—'} (${r.burnout_dp_nivel || '—'}), RP ${r.burnout_rp ?? '—'} (${r.burnout_rp_nivel || '—'})`
+      `- ${r.participant_full_name}: Cansancio Emocional ${r.burnout_ce ?? '—'} (${r.burnout_ce_nivel || '—'}), Despersonalización ${r.burnout_dp ?? '—'} (${r.burnout_dp_nivel || '—'}), Realización Personal ${r.burnout_rp ?? '—'} (${r.burnout_rp_nivel || '—'})`
     ).join('\n');
   } else {
     instrumentDesc = 'Test de Personalidad de cuatro temperamentos (Sanguíneo, Colérico, Melancólico, Flemático) con puntuaciones A-D y temperamento dominante/secundario.';
@@ -129,6 +129,7 @@ Reglas:
 - Español formal y profesional, con prudencia clínica: orientativo, no diagnóstico definitivo.
 - Máximo 450 palabras en total.
 - Texto plano: NO uses markdown, asteriscos ni viñetas con símbolos. Las recomendaciones numéralas como "1.", "2.", etc. en líneas separadas.
+- NO uses abreviaturas ni siglas; escribe siempre los nombres completos de las subescalas o variables (por ejemplo "Realización Personal", nunca "RP").
 - No inventes datos que no estén en el contexto.`;
 
   const controller = new AbortController();
