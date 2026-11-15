@@ -410,19 +410,29 @@ function generateConsolidatedPDF(doc, event, responses, includeDetail = false, i
     const nivelCount = (dim, nivel) => responses.filter(r => r[`burnout_${dim}_nivel`] === nivel).length;
 
     const subsecalas = [
-      { label: 'CE Alto (riesgo)', count: nivelCount('ce', 'ALTO'), color: COLORS.nivelAlto },
-      { label: 'CE Medio', count: nivelCount('ce', 'MEDIO'), color: COLORS.nivelMedio },
-      { label: 'CE Bajo', count: nivelCount('ce', 'BAJO'), color: COLORS.nivelBajo },
-      { label: 'DP Alto (riesgo)', count: nivelCount('dp', 'ALTO'), color: COLORS.nivelAlto },
-      { label: 'DP Medio', count: nivelCount('dp', 'MEDIO'), color: COLORS.nivelMedio },
-      { label: 'DP Bajo', count: nivelCount('dp', 'BAJO'), color: COLORS.nivelBajo },
-      { label: 'RP Bajo (riesgo)', count: nivelCount('rp', 'BAJO'), color: COLORS.nivelAlto },
-      { label: 'RP Medio', count: nivelCount('rp', 'MEDIO'), color: COLORS.nivelMedio },
-      { label: 'RP Alto', count: nivelCount('rp', 'ALTO'), color: COLORS.nivelBajo },
+      { label: 'Cansancio Emocional — Alto (riesgo)', count: nivelCount('ce', 'ALTO'), color: COLORS.nivelAlto },
+      { label: 'Cansancio Emocional — Medio', count: nivelCount('ce', 'MEDIO'), color: COLORS.nivelMedio },
+      { label: 'Cansancio Emocional — Bajo', count: nivelCount('ce', 'BAJO'), color: COLORS.nivelBajo },
+      { label: 'Despersonalización — Alto (riesgo)', count: nivelCount('dp', 'ALTO'), color: COLORS.nivelAlto },
+      { label: 'Despersonalización — Medio', count: nivelCount('dp', 'MEDIO'), color: COLORS.nivelMedio },
+      { label: 'Despersonalización — Bajo', count: nivelCount('dp', 'BAJO'), color: COLORS.nivelBajo },
+      { label: 'Realización Personal — Baja (riesgo)', count: nivelCount('rp', 'BAJO'), color: COLORS.nivelAlto },
+      { label: 'Realización Personal — Media', count: nivelCount('rp', 'MEDIO'), color: COLORS.nivelMedio },
+      { label: 'Realización Personal — Alta', count: nivelCount('rp', 'ALTO'), color: COLORS.nivelBajo },
     ];
 
+    const bFullW = doc.page.width - 80;
     for (const s of subsecalas) {
-      y = drawScoreBar(doc, y, s.label + ':', s.count, total, s.color);
+      const pct = s.count / total * 100;
+      doc.fontSize(10).font('Helvetica-Bold').fillColor(COLORS.text)
+        .text(s.label, 40, y, { width: bFullW - 70 });
+      doc.fontSize(10).font('Helvetica-Bold').fillColor(s.color)
+        .text(`${s.count} (${pct.toFixed(1)}%)`, 40 + bFullW - 70, y, { width: 70, align: 'right' });
+      const labelH = doc.heightOfString(s.label, { width: bFullW - 70 });
+      const barY = y + labelH + 3;
+      doc.rect(40, barY, bFullW, 12).fill('#E0E0E0');
+      if (pct > 0) doc.rect(40, barY, (pct / 100) * bFullW, 12).fill(s.color);
+      y = barY + 12 + 8;
     }
 
     if (aiAnalysis) {
