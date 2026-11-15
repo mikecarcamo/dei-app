@@ -8,7 +8,7 @@ import {
 import {
   Menu as MenuIcon, Dashboard, People, Business, Assignment,
   Event, VpnKey, Assessment, Logout, Psychology, AdminPanelSettings,
-  LockReset, BarChart,
+  LockReset, BarChart, MedicalServices, FactCheck, PersonSearch, HealthAndSafety,
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 
@@ -16,7 +16,9 @@ const DRAWER_WIDTH = 240;
 
 const adminMenuItems = [
   { label: 'Dashboard', icon: <Dashboard />, path: '/admin' },
-  { label: 'Entidades', icon: <Business />, path: '/admin/entities' },
+  { label: 'Entidades', icon: <Business />, path: '/admin/entities', children: [
+    { label: 'Terapeutas', icon: <HealthAndSafety />, path: '/admin/therapists' },
+  ] },
   { label: 'Usuarios', icon: <People />, path: '/admin/users' },
   { label: 'Tests', icon: <Assignment />, path: '/admin/tests' },
   { label: 'Eventos', icon: <Event />, path: '/admin/events' },
@@ -35,6 +37,13 @@ const userMenuItems = [
   { label: 'Mis Test', icon: <Psychology />, path: '/' },
 ];
 
+const therapistMenuItems = [
+  { label: 'Terapeuta', icon: <MedicalServices />, children: [
+    { label: 'Tamizaje', icon: <FactCheck />, path: '/terapeuta/tamizaje' },
+    { label: 'Pacientes', icon: <PersonSearch />, path: '/terapeuta/pacientes' },
+  ] },
+];
+
 export default function Layout({ isAdmin = false }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -43,17 +52,48 @@ export default function Layout({ isAdmin = false }) {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [drawerOpen, setDrawerOpen] = useState(!isMobile);
 
-  const menuItems = isAdmin
-    ? (user?.role === 'EMPRESA' ? empresaMenuItems : adminMenuItems)
-    : userMenuItems;
+  const menuItems = user?.role === 'TERAPEUTA'
+    ? therapistMenuItems
+    : isAdmin
+      ? (user?.role === 'EMPRESA' ? empresaMenuItems : adminMenuItems)
+      : userMenuItems;
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
-  const roleColor = { ADMIN: 'error', EMPRESA: 'warning', USUARIO: 'primary' };
-  const roleLabel = { ADMIN: 'Administrador', EMPRESA: 'Empresa', USUARIO: 'Usuario' };
+  const roleColor = { ADMIN: 'error', EMPRESA: 'warning', USUARIO: 'primary', TERAPEUTA: 'success' };
+  const roleLabel = { ADMIN: 'Administrador', EMPRESA: 'Empresa', USUARIO: 'Usuario', TERAPEUTA: 'Terapeuta' };
+
+  const renderItem = (item, nested = false) => {
+    const active = !!item.path && (location.pathname === item.path || (item.path !== '/admin' && item.path !== '/' && location.pathname.startsWith(item.path)));
+    return (
+      <React.Fragment key={item.path || item.label}>
+        <ListItem disablePadding>
+          <ListItemButton
+            onClick={item.path ? () => { navigate(item.path); if (isMobile) setDrawerOpen(false); } : undefined}
+            disableRipple={!item.path}
+            sx={{
+              mx: 1, mb: 0.5, borderRadius: 2, pl: nested ? 4 : 2,
+              cursor: item.path ? 'pointer' : 'default',
+              bgcolor: active ? 'rgba(255,255,255,0.15)' : 'transparent',
+              '&:hover': { bgcolor: item.path ? 'rgba(255,255,255,0.1)' : 'transparent' },
+            }}
+          >
+            <ListItemIcon sx={{ color: active ? 'white' : 'rgba(255,255,255,0.7)', minWidth: 40 }}>
+              {item.icon}
+            </ListItemIcon>
+            <ListItemText
+              primary={item.label}
+              primaryTypographyProps={{ fontSize: nested ? 13 : 14, fontWeight: active || (!item.path && item.children) ? 700 : 400, color: active ? 'white' : 'rgba(255,255,255,0.85)' }}
+            />
+          </ListItemButton>
+        </ListItem>
+        {item.children?.map(child => renderItem(child, true))}
+      </React.Fragment>
+    );
+  };
 
   const drawer = (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', bgcolor: '#0D47A1' }}>
@@ -76,29 +116,7 @@ export default function Layout({ isAdmin = false }) {
       </Box>
 
       <List sx={{ flex: 1, py: 1 }}>
-        {menuItems.map((item) => {
-          const active = location.pathname === item.path || (item.path !== '/admin' && item.path !== '/' && location.pathname.startsWith(item.path));
-          return (
-            <ListItem key={item.path} disablePadding>
-              <ListItemButton
-                onClick={() => { navigate(item.path); if (isMobile) setDrawerOpen(false); }}
-                sx={{
-                  mx: 1, mb: 0.5, borderRadius: 2,
-                  bgcolor: active ? 'rgba(255,255,255,0.15)' : 'transparent',
-                  '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
-                }}
-              >
-                <ListItemIcon sx={{ color: active ? 'white' : 'rgba(255,255,255,0.7)', minWidth: 40 }}>
-                  {item.icon}
-                </ListItemIcon>
-                <ListItemText
-                  primary={item.label}
-                  primaryTypographyProps={{ fontSize: 14, fontWeight: active ? 700 : 400, color: active ? 'white' : 'rgba(255,255,255,0.85)' }}
-                />
-              </ListItemButton>
-            </ListItem>
-          );
-        })}
+        {menuItems.map(item => renderItem(item))}
       </List>
 
       <Divider sx={{ borderColor: 'rgba(255,255,255,0.1)' }} />

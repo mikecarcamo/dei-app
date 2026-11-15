@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 
@@ -21,6 +21,11 @@ import Events from './pages/admin/Events';
 import Licenses from './pages/admin/Licenses';
 import Reports from './pages/admin/Reports';
 import EmpresaEvents from './pages/admin/EmpresaEvents';
+import Therapists from './pages/admin/Therapists';
+
+import Screening from './pages/therapist/Screening';
+import Patients from './pages/therapist/Patients';
+import PatientDetail from './pages/therapist/PatientDetail';
 
 const theme = createTheme({
   palette: {
@@ -54,6 +59,12 @@ function AdminLayout() {
   return <Layout isAdmin={true} />;
 }
 
+function HomeRoute() {
+  const { user } = useAuth();
+  if (user?.role === 'TERAPEUTA') return <Navigate to="/terapeuta/tamizaje" replace />;
+  return <Dashboard />;
+}
+
 export default function App() {
   return (
     <ThemeProvider theme={theme}>
@@ -72,7 +83,7 @@ export default function App() {
             {/* Panel de usuario */}
             <Route element={<ProtectedRoute />}>
               <Route element={<UserLayout />}>
-                <Route path="/" element={<Dashboard />} />
+                <Route path="/" element={<HomeRoute />} />
                 <Route path="/test/:eventId" element={<TestForm />} />
               </Route>
             </Route>
@@ -93,6 +104,16 @@ export default function App() {
                 <Route path="/admin/events" element={<Events />} />
                 <Route path="/admin/licenses" element={<Licenses />} />
                 <Route path="/admin/reports" element={<Reports />} />
+                <Route path="/admin/therapists" element={<Therapists />} />
+              </Route>
+            </Route>
+
+            {/* Módulo de terapeutas */}
+            <Route element={<ProtectedRoute roles={['TERAPEUTA']} />}>
+              <Route element={<UserLayout />}>
+                <Route path="/terapeuta/tamizaje" element={<Screening />} />
+                <Route path="/terapeuta/pacientes" element={<Patients />} />
+                <Route path="/terapeuta/pacientes/:id" element={<PatientDetail />} />
               </Route>
             </Route>
 

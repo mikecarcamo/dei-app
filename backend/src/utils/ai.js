@@ -1,23 +1,28 @@
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'openai/gpt-oss-120b';
 
-async function callGroq(prompt) {
+async function callGroq(prompt, { system, json = false, timeoutMs = 20000, temperature = 0.4 } = {}) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) return null;
 
+  const messages = system
+    ? [{ role: 'system', content: system }, { role: 'user', content: prompt }]
+    : [{ role: 'user', content: prompt }];
+
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const resp = await fetch(GROQ_URL, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: GROQ_MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.4,
+        messages,
+        temperature,
         max_tokens: 6000,
         reasoning_effort: 'low',
         include_reasoning: false,
+        ...(json ? { response_format: { type: 'json_object' } } : {}),
       }),
       signal: controller.signal,
     });
@@ -184,4 +189,103 @@ Reglas:
   return callGroq(prompt);
 }
 
-module.exports = { generateClimaAnalysis, generateClinicalAnalysis, generateComparativeAnalysis, TEMP_LABELS };
+const SCREENING_PROMPT_VERSION = 'tamizaje-v1';
+let clinicalKnowledge = null;
+
+function loadClinicalKnowledge() {
+  if (clinicalKnowledge !== null) return clinicalKnowledge;
+  try {
+    const raw = require('fs').readFileSync(
+      require('path').join(__dirname, '../../knowledge/clinical-mental-health/SKILL.md'), 'utf8'
+    );
+    clinicalKnowledge = raw.replace(/^---[\s\S]*?---\s*/, '').replace(/^More therapy AI tools.*$/m, '').trim();
+  } catch (e) {
+    console.error('No se pudo cargar SKILL.md clínico:', e.message);
+    clinicalKnowledge = '';
+  }
+  return clinicalKnowledge;
+}
+
+function extractJson(text) {
+  if (!text) return null;
+  try { return JSON.parse(text); } catch (e) { /* intenta extraer el primer objeto */ }
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start === -1 || end <= start) return null;
+  try { return JSON.parse(text.slice(start, end + 1)); } catch (e) { return null; }
+}
+
+function asStringArray(v) {
+  return Array.isArray(v) ? v.map(x => String(x)).filter(Boolean) : [];
+}
+
+function validateScreeningOutput(obj) {
+  if (!obj || typeof obj !== 'object') return null;
+  const hipotesis = (Array.isArray(obj.hipotesis) ? obj.hipotesis : []).map(h => ({
+    codigo_dsm5: String(h?.codigo_dsm5 || ''),
+    codigo_cie10: String(h?.codigo_cie10 || ''),
+    nombre: String(h?.nombre || ''),
+    nivel_de_apoyo: ['alto', 'medio', 'bajo'].includes(String(h?.nivel_de_apoyo).toLowerCase()) ? String(h.nivel_de_apoyo).toLowerCase() : 'bajo',
+    criterios_que_se_cumplen: asStringArray(h?.criterios_que_se_cumplen),
+    criterios_que_faltan: asStringArray(h?.criterios_que_faltan),
+    diagnosticos_diferenciales: asStringArray(h?.diagnosticos_diferenciales),
+    preguntas_sugeridas_para_aclarar: asStringArray(h?.preguntas_sugeridas_para_aclarar),
+  }));
+  return {
+    resumen: String(obj.resumen || ''),
+    conclusion: String(obj.conclusion || ''),
+    hipotesis,
+    recomendaciones: asStringArray(obj.recomendaciones),
+    limitaciones: String(obj.limitaciones || ''),
+  };
+}
+
+// context: datos anonimizados (sin nombre ni contacto)
+async function generateScreeningAnalysis(context, whitelist) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return null;
+
+  const system = `Eres un asistente de apoyo clínico para psicólogos y terapeutas. Tu función es ofrecer un PANORAMA INICIAL a partir de un tamizaje; NO diagnosticas. Redactas siempre como "hipótesis para revisión profesional", nunca afirmas que el paciente "tiene" un trastorno.
+
+Base de conocimiento clínica (parafraseada, úsala como referencia):
+${loadClinicalKnowledge()}
+
+Reglas obligatorias:
+- Responde SOLO con un objeto JSON válido, sin texto adicional.
+- Usa únicamente códigos de esta lista permitida (CIE-10-MC usada por el DSM-5-TR); si ninguno aplica, deja "hipotesis" vacío:
+${whitelist.map(w => `${w.code} = ${w.name}`).join('\n')}
+- Los puntajes y severidades ya fueron calculados por el sistema: no los recalcules ni los contradigas.
+- No copies texto literal del DSM; describe los criterios con tus propias palabras.
+- No recomiendes medicación; si procede, sugiere derivación a psiquiatría.
+- Español formal y profesional, sin abreviaturas ni siglas salvo los nombres de los instrumentos.`;
+
+  const prompt = `Datos del tamizaje (anonimizados):
+${JSON.stringify(context, null, 2)}
+
+Devuelve un JSON con esta forma exacta:
+{
+  "resumen": "panorama clínico inicial en 1-2 párrafos",
+  "conclusion": "conclusión orientativa del tamizaje en 1 párrafo",
+  "hipotesis": [
+    {
+      "codigo_dsm5": "código de la lista",
+      "codigo_cie10": "mismo código de la lista",
+      "nombre": "nombre del trastorno",
+      "nivel_de_apoyo": "alto | medio | bajo",
+      "criterios_que_se_cumplen": ["..."],
+      "criterios_que_faltan": ["..."],
+      "diagnosticos_diferenciales": ["..."],
+      "preguntas_sugeridas_para_aclarar": ["..."]
+    }
+  ],
+  "recomendaciones": ["..."],
+  "limitaciones": "limitaciones de este tamizaje"
+}`;
+
+  const raw = await callGroq(prompt, { system, json: true, timeoutMs: 45000, temperature: 0.2 });
+  const parsed = validateScreeningOutput(extractJson(raw));
+  if (!parsed) return null;
+  return { ...parsed, model: GROQ_MODEL, prompt_version: SCREENING_PROMPT_VERSION };
+}
+
+module.exports = { generateClimaAnalysis, generateClinicalAnalysis, generateComparativeAnalysis, generateScreeningAnalysis, TEMP_LABELS };

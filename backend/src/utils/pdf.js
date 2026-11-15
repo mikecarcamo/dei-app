@@ -927,4 +927,8 @@ function generateComparativePDF(doc, testType, entityName, items, aiAnalysis) {
   }
 }
 
-module.exports = { generateIndividualPDF, generateConsolidatedPDF, generateClimaConsolidatedPDF, generateClimaIndividualPDF, generateComparativePDF, appendDisclaimer, drawWatermark };
+module.exports = {
+  generateIndividualPDF, generateConsolidatedPDF, generateClimaConsolidatedPDF, generateClimaIndividualPDF,
+  generateComparativePDF, appendDisclaimer, drawWatermark,
+  COLORS, drawHeader, drawSection, drawBox, markDarkPage,
+};

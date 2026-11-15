@@ -40,6 +40,7 @@ app.use('/api/events', eventRoutes);
 app.use('/api/responses', responseRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/surveys', require('./routes/surveys'));
+app.use('/api/therapy', require('./routes/therapy'));
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', version: '1.0.0', timestamp: new Date().toISOString() });
