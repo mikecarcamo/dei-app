@@ -672,8 +672,8 @@ function generateClimaConsolidatedPDF(doc, event, indicatorStats, factorStats, r
       }
     }
     y += 6;
-    doc.fontSize(7.5).font('Helvetica-Oblique').fillColor(COLORS.muted)
-      .text('Análisis generado por inteligencia artificial a partir de las estadísticas del evento. Revise antes de su uso oficial.', 40, y, { width: doc.page.width - 80, align: 'center' });
+    if (y > doc.page.height - 160) { doc.addPage(); markDarkPage(doc); y = 50; }
+    drawSignature(doc, y);
   }
 
   doc.addPage();
