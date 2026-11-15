@@ -3,15 +3,17 @@ import {
   Box, Typography, Card, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, IconButton, Chip, CircularProgress, Tooltip,
 } from '@mui/material';
-import { People, VpnKey, QrCode } from '@mui/icons-material';
+import { People, VpnKey, QrCode, PictureAsPdf } from '@mui/icons-material';
 import api from '../../api/axios';
 import { AssignUsersDialog, CodesDialog } from './Events';
+import { ConsolidatedDialog } from './Reports';
 
 export default function EmpresaEvents() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [codesDialogOpen, setCodesDialogOpen] = useState(false);
+  const [consolidatedEvent, setConsolidatedEvent] = useState(null);
   const [selected, setSelected] = useState(null);
 
   const load = () => {
@@ -74,6 +76,9 @@ export default function EmpresaEvents() {
                           <IconButton size="small" onClick={() => { setSelected(ev); setDialogOpen(true); }}><People fontSize="small" /></IconButton>
                         </Tooltip>
                       )}
+                      <Tooltip title="PDF Consolidado">
+                        <IconButton size="small" color="secondary" onClick={() => setConsolidatedEvent(ev)}><PictureAsPdf fontSize="small" /></IconButton>
+                      </Tooltip>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -94,6 +99,10 @@ export default function EmpresaEvents() {
       <CodesDialog
         open={codesDialogOpen} event={selected}
         onClose={() => setCodesDialogOpen(false)}
+      />
+      <ConsolidatedDialog
+        open={!!consolidatedEvent} event={consolidatedEvent || {}}
+        onClose={() => setConsolidatedEvent(null)}
       />
     </Box>
   );

@@ -15,7 +15,7 @@ import PdfViewerModal, { isMobile, openOrDownloadPdf } from '../../components/Pd
 
 const TEMP_LABELS = { SANGUINEO: 'Sanguíneo', COLERICO: 'Colérico', MELANCOLICO: 'Melancólico', FLEMATICO: 'Flemático' };
 
-function ConsolidatedDialog({ open, event, onClose }) {
+export function ConsolidatedDialog({ open, event, onClose }) {
   const [downloading, setDownloading] = useState(null);
   const [pdfViewer, setPdfViewer] = useState(null);
 
