@@ -1,6 +1,40 @@
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'openai/gpt-oss-120b';
 
+async function callGroq(prompt) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return null;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
+  try {
+    const resp = await fetch(GROQ_URL, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.4,
+        max_tokens: 6000,
+        reasoning_effort: 'low',
+        include_reasoning: false,
+      }),
+      signal: controller.signal,
+    });
+    if (!resp.ok) {
+      console.error('Groq API error:', resp.status, await resp.text());
+      return null;
+    }
+    const data = await resp.json();
+    return data.choices?.[0]?.message?.content?.trim() || null;
+  } catch (e) {
+    console.error('Groq request failed:', e.message);
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function classify(pct, isExternal) {
   if (pct >= 90) return 'Excelente';
   if (pct >= 80) return 'Bueno';
@@ -59,34 +93,7 @@ Reglas:
 - Texto plano: NO uses markdown, asteriscos, numerales ni viñetas con símbolos. Las recomendaciones numéralas como "1.", "2.", etc. en líneas separadas.
 - No inventes datos que no estén en el contexto.`;
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20000);
-  try {
-    const resp = await fetch(GROQ_URL, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.4,
-        max_tokens: 6000,
-        reasoning_effort: 'low',
-        include_reasoning: false,
-      }),
-      signal: controller.signal,
-    });
-    if (!resp.ok) {
-      console.error('Groq API error:', resp.status, await resp.text());
-      return null;
-    }
-    const data = await resp.json();
-    return data.choices?.[0]?.message?.content?.trim() || null;
-  } catch (e) {
-    console.error('Groq request failed:', e.message);
-    return null;
-  } finally {
-    clearTimeout(timeout);
-  }
+  return callGroq(prompt);
 }
 
 async function generateClinicalAnalysis(event, testType, responses) {
@@ -132,34 +139,48 @@ Reglas:
 - NO uses abreviaturas ni siglas; escribe siempre los nombres completos de las subescalas o variables (por ejemplo "Realización Personal", nunca "RP").
 - No inventes datos que no estén en el contexto.`;
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20000);
-  try {
-    const resp = await fetch(GROQ_URL, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.4,
-        max_tokens: 6000,
-        reasoning_effort: 'low',
-        include_reasoning: false,
-      }),
-      signal: controller.signal,
-    });
-    if (!resp.ok) {
-      console.error('Groq API error:', resp.status, await resp.text());
-      return null;
-    }
-    const data = await resp.json();
-    return data.choices?.[0]?.message?.content?.trim() || null;
-  } catch (e) {
-    console.error('Groq request failed:', e.message);
-    return null;
-  } finally {
-    clearTimeout(timeout);
-  }
+  return callGroq(prompt);
 }
 
-module.exports = { generateClimaAnalysis, generateClinicalAnalysis };
+const TEMP_LABELS = { SANGUINEO: 'Sanguíneo', COLERICO: 'Colérico', MELANCOLICO: 'Melancólico', FLEMATICO: 'Flemático', EMPATE: 'Empate' };
+
+async function generateComparativeAnalysis(testType, entityName, summaries) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey || summaries.length < 2) return null;
+
+  const instrumentDesc = {
+    CLIMA: 'Encuesta de Clima Laboral (ponderación porcentual por factor, escala 1-5)',
+    BURNOUT: 'Cuestionario Burnout MBI (Cansancio Emocional, Despersonalización, Realización Personal)',
+    PERSONALIDAD: 'Test de Personalidad de cuatro temperamentos (Sanguíneo, Colérico, Melancólico, Flemático)',
+  }[testType] || testType;
+
+  const lines = summaries.map(s => `- ${s.line}`).join('\n');
+
+  const prompt = `Eres un psicólogo clínico organizacional senior. Redacta un análisis comparativo profesional en español de la evolución de una entidad a través de varios eventos de evaluación psicológica con el mismo instrumento, con enfoque de psicología clínica organizacional.
+
+Contexto:
+- Entidad: ${entityName}
+- Instrumento: ${instrumentDesc}
+- Eventos comparados (del más reciente al más antiguo): ${summaries.length}
+
+Resumen por evento:
+${lines}
+
+Estructura el texto EXACTAMENTE con estos títulos en mayúsculas, cada uno seguido de sus párrafos:
+RESUMEN EJECUTIVO
+COMPARACIÓN ENTRE EVENTOS
+HALLAZGOS CLÍNICOS
+RECOMENDACIONES
+
+Reglas:
+- En COMPARACIÓN ENTRE EVENTOS indica explícitamente si los resultados mejoraron o empeoraron respecto al evento anterior y en qué aspectos o indicadores ocurrió el cambio, citando las cifras de cada evento.
+- Español formal y profesional, con prudencia clínica: orientativo, no diagnóstico definitivo.
+- Máximo 450 palabras en total.
+- Texto plano: NO uses markdown, asteriscos ni viñetas con símbolos. Las recomendaciones numéralas como "1.", "2.", etc. en líneas separadas.
+- NO uses abreviaturas ni siglas; escribe siempre los nombres completos.
+- No inventes datos que no estén en el contexto.`;
+
+  return callGroq(prompt);
+}
+
+module.exports = { generateClimaAnalysis, generateClinicalAnalysis, generateComparativeAnalysis, TEMP_LABELS };

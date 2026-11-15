@@ -18,6 +18,16 @@ const TEMP_LABELS = { SANGUINEO: 'Sanguíneo', COLERICO: 'Colérico', MELANCOLIC
 export function ConsolidatedDialog({ open, event, onClose }) {
   const [downloading, setDownloading] = useState(null);
   const [pdfViewer, setPdfViewer] = useState(null);
+  const [comparativeInfo, setComparativeInfo] = useState(null);
+
+  useEffect(() => {
+    if (open && event?.id) {
+      setComparativeInfo(null);
+      api.get(`/reports/comparative-info/${event.id}`)
+        .then(({ data }) => setComparativeInfo(data))
+        .catch(() => setComparativeInfo(null));
+    }
+  }, [open, event?.id]);
 
   const handleOpen = async (detailMode) => {
     setDownloading(detailMode);
@@ -27,6 +37,20 @@ export function ConsolidatedDialog({ open, event, onClose }) {
       const token = localStorage.getItem('dei_token');
       const viewUrl = await openOrDownloadPdf({ url, filename: `consolidado_${(event.name||'evento').replace(/\s+/g,'_')}.pdf`, token });
       if (viewUrl) setPdfViewer({ url, title: `Consolidado: ${event.name}`, filename: `consolidado_${(event.name||'evento').replace(/\s+/g,'_')}.pdf`, token });
+    } finally {
+      setDownloading(null);
+    }
+  };
+
+  const handleComparative = async () => {
+    setDownloading('comparative');
+    try {
+      const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+      const url = `${baseURL}/reports/comparative/${event.id}`;
+      const token = localStorage.getItem('dei_token');
+      const filename = `comparativo_${(event.entity_name||'entidad').replace(/\s+/g,'_')}.pdf`;
+      const viewUrl = await openOrDownloadPdf({ url, filename, token });
+      if (viewUrl) setPdfViewer({ url, title: `Comparativo: ${event.entity_name || ''}`, filename, token });
     } finally {
       setDownloading(null);
     }
@@ -51,6 +75,12 @@ export function ConsolidatedDialog({ open, event, onClose }) {
             disabled={!!downloading} onClick={() => handleOpen('full')}>
             Con detalle de respuestas por persona
           </Button>
+          {comparativeInfo?.eligible && (
+            <Button fullWidth variant="contained" color="primary" startIcon={downloading === 'comparative' ? <CircularProgress size={18} /> : <Assessment />}
+              disabled={!!downloading} onClick={handleComparative}>
+              Reporte comparativo (últimos {comparativeInfo.count} eventos)
+            </Button>
+          )}
         </Box>
       </DialogContent>
       <DialogActions>

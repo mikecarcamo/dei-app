@@ -814,4 +814,117 @@ function generateClimaIndividualPDF(doc, response, event, answers) {
   }
 }
 
-module.exports = { generateIndividualPDF, generateConsolidatedPDF, generateClimaConsolidatedPDF, generateClimaIndividualPDF, appendDisclaimer, drawWatermark };
+const TEMP_DIST_COLORS = { Sanguíneo: '#42A5F5', Colérico: '#EF5350', Melancólico: '#7E57C2', Flemático: '#66BB6A', Empate: '#BDBDBD' };
+const TEST_TYPE_LABELS = { CLIMA: 'Encuesta de Clima Laboral', BURNOUT: 'Cuestionario Burnout (MBI)', PERSONALIDAD: 'Test de Personalidad' };
+
+function comparativeBarColor(pct) {
+  if (pct >= 90) return '#1565C0';
+  if (pct >= 80) return '#2E7D32';
+  if (pct >= 66) return '#FF6F00';
+  return '#C62828';
+}
+
+function generateComparativePDF(doc, testType, entityName, items, aiAnalysis) {
+  let y = drawHeader(doc, 'Reporte Comparativo por Evento', entityName);
+  const fullW = doc.page.width - 80;
+
+  y = drawSection(doc, y, 'Entidad:', entityName);
+  y = drawSection(doc, y, 'Instrumento:', TEST_TYPE_LABELS[testType] || testType);
+  y = drawSection(doc, y, 'Eventos comparados:', String(items.length));
+  const oldest = items[items.length - 1];
+  const newest = items[0];
+  y = drawSection(doc, y, 'Periodo total:', `${formatFecha(oldest.start_date)} → ${formatFecha(newest.end_date || newest.start_date)}`);
+  y += 12;
+
+  // Tabla de eventos incluidos
+  doc.fontSize(13).font('Helvetica-Bold').fillColor(COLORS.primary).text('EVENTOS INCLUIDOS', 40, y);
+  y += 20;
+
+  const metricHdr = { CLIMA: 'Ponderación', BURNOUT: '% en riesgo', PERSONALIDAD: 'Dominante más frecuente' }[testType] || 'Métrica';
+  const colX = [40, 65, 90, 270, 390, 470];
+  const colW = [25, 25, 180, 120, 80, 100];
+  const hdrs = ['No.', 'ID', 'Evento', 'Periodo', 'Encuestas', metricHdr];
+
+  doc.rect(40, y, fullW, 20).fill(COLORS.primary);
+  doc.fillColor(COLORS.white).fontSize(9).font('Helvetica-Bold');
+  hdrs.forEach((h, i) => doc.text(h, colX[i], y + 5, { width: colW[i] }));
+  y += 22;
+
+  items.forEach((it, i) => {
+    if (y > doc.page.height - 80) { doc.addPage(); markDarkPage(doc); y = 50; }
+    doc.save();
+    doc.fillOpacity(0.5).rect(40, y, fullW, 18).fill(i % 2 === 0 ? COLORS.accent : COLORS.white);
+    doc.restore();
+    doc.fillColor(COLORS.text).fontSize(9).font('Helvetica');
+    doc.text(String(items.length - i), colX[0], y + 4, { width: colW[0] });
+    doc.text(`#${it.id}`, colX[1], y + 4, { width: colW[1] });
+    doc.text(it.name, colX[2], y + 4, { width: colW[2] });
+    doc.text(`${formatFecha(it.start_date)} → ${formatFecha(it.end_date)}`, colX[3], y + 4, { width: colW[3] });
+    doc.text(String(it.count), colX[4], y + 4, { width: colW[4] });
+    doc.text(it.tableMetric || '—', colX[5], y + 4, { width: colW[5] });
+    y += 20;
+  });
+  y += 16;
+
+  // Gráfica comparativa
+  if (y > doc.page.height - 200) { doc.addPage(); markDarkPage(doc); y = 50; }
+  doc.fontSize(13).font('Helvetica-Bold').fillColor(COLORS.primary).text('GRÁFICA COMPARATIVA', 40, y);
+  y += 22;
+
+  if (testType === 'PERSONALIDAD') {
+    // Leyenda
+    let lx = 40;
+    doc.fontSize(9).font('Helvetica');
+    for (const [label, color] of Object.entries(TEMP_DIST_COLORS)) {
+      doc.rect(lx, y + 2, 8, 8).fill(color);
+      doc.fillColor(COLORS.text).text(label, lx + 12, y, { width: 80, lineBreak: false });
+      lx += 12 + doc.widthOfString(label) + 18;
+    }
+    y += 20;
+    // Barras apiladas por evento
+    for (const it of items) {
+      const total = it.count || 1;
+      doc.fontSize(9).font('Helvetica-Bold').fillColor(COLORS.text)
+        .text(`#${it.id} ${it.name}`, 40, y, { width: fullW - 60 });
+      doc.fontSize(9).font('Helvetica-Bold').fillColor(COLORS.secondary)
+        .text(`${it.count} enc.`, 40 + fullW - 60, y, { width: 60, align: 'right' });
+      const barY = y + 14;
+      let bx = 40;
+      for (const [label, color] of Object.entries(TEMP_DIST_COLORS)) {
+        const n = (it.dist && it.dist[label]) || 0;
+        const w = (n / total) * fullW;
+        if (w > 0.5) { doc.rect(bx, barY, w, 14).fill(color); }
+        bx += w;
+      }
+      doc.rect(40, barY, fullW, 14).stroke('#CCCCCC');
+      y = barY + 14 + 10;
+    }
+  } else {
+    const barColor = testType === 'BURNOUT' ? COLORS.burnout : null;
+    for (const it of items) {
+      const pct = Math.max(0, Math.min(100, it.metricPct || 0));
+      doc.fontSize(9).font('Helvetica-Bold').fillColor(COLORS.text)
+        .text(`#${it.id} ${it.name}`, 40, y, { width: fullW - 70 });
+      doc.fontSize(9).font('Helvetica-Bold').fillColor(barColor || comparativeBarColor(pct))
+        .text(`${pct.toFixed(1)}%`, 40 + fullW - 70, y, { width: 70, align: 'right' });
+      const labelH = doc.heightOfString(it.name, { width: fullW - 70 });
+      const barY = y + labelH + 3;
+      doc.rect(40, barY, fullW, 12).fill('#E0E0E0');
+      if (pct > 0) doc.rect(40, barY, (pct / 100) * fullW, 12).fill(barColor || comparativeBarColor(pct));
+      y = barY + 12 + 10;
+    }
+    doc.fontSize(8).font('Helvetica-Oblique').fillColor(COLORS.muted)
+      .text(testType === 'BURNOUT' ? 'Porcentaje de participantes en niveles de riesgo por evento.' : 'Ponderación general obtenida por evento.', 40, y, { width: fullW });
+    y += 16;
+  }
+
+  if (aiAnalysis) {
+    drawAIAnalysisPage(doc, aiAnalysis, COLORS.primary);
+  } else {
+    y += 10;
+    if (y > doc.page.height - 160) { doc.addPage(); markDarkPage(doc); y = 50; }
+    drawSignature(doc, y);
+  }
+}
+
+module.exports = { generateIndividualPDF, generateConsolidatedPDF, generateClimaConsolidatedPDF, generateClimaIndividualPDF, generateComparativePDF, appendDisclaimer, drawWatermark };
