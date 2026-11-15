@@ -8,7 +8,7 @@ import { ExpandMore, PictureAsPdf, AutoAwesome, WarningAmber } from '@mui/icons-
 import api from '../../api/axios';
 import PdfViewerModal, { openOrDownloadPdf } from '../../components/PdfViewerModal';
 
-export const DISCLAIMER = 'Este tamizaje es una herramienta de apoyo y NO constituye un diagnóstico. Las hipótesis sugeridas por la IA requieren evaluación y criterio de un profesional de salud mental.';
+export const DISCLAIMER = 'Este tamizaje es una herramienta de apoyo y NO constituye un diagnóstico. Requiere evaluación y criterio de un profesional de salud mental.';
 
 export function fmtDateTime(str) {
   if (!str) return '—';

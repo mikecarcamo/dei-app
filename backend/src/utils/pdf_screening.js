@@ -1,7 +1,7 @@
 const { COLORS, drawHeader, drawSection, drawBox } = require('./pdf');
 const { INSTRUMENTS } = require('./screening');
 
-const DISCLAIMER = 'Este tamizaje es una herramienta de apoyo y NO constituye un diagnóstico. Las hipótesis sugeridas requieren evaluación y criterio de un profesional de salud mental.';
+const DISCLAIMER = 'Este tamizaje es una herramienta de apoyo y NO constituye un diagnóstico. Requiere evaluación y criterio de un profesional de salud mental.';
 const SUPPORT_LABEL = { alto: 'Alto', medio: 'Medio', bajo: 'Bajo' };
 
 function fmtDateTime(str) {
