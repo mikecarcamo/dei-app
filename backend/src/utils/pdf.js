@@ -815,7 +815,7 @@ function generateClimaIndividualPDF(doc, response, event, answers) {
 }
 
 const TEMP_DIST_COLORS = { Sanguíneo: '#42A5F5', Colérico: '#EF5350', Melancólico: '#7E57C2', Flemático: '#66BB6A', Empate: '#BDBDBD' };
-const TEST_TYPE_LABELS = { CLIMA: 'Encuesta de Clima Laboral', BURNOUT: 'Cuestionario Burnout (MBI)', PERSONALIDAD: 'Test de Personalidad' };
+const TEST_TYPE_LABELS = { CLIMA: 'Encuesta de Clima Laboral', BURNOUT: 'Cuestionario Burnout (MBI)', PERSONALIDAD: 'Test de Personalidad', TEMPERAMENTO: 'Test de Personalidad' };
 
 function comparativeBarColor(pct) {
   if (pct >= 90) return '#1565C0';
@@ -871,7 +871,7 @@ function generateComparativePDF(doc, testType, entityName, items, aiAnalysis) {
   doc.fontSize(13).font('Helvetica-Bold').fillColor(COLORS.primary).text('GRÁFICA COMPARATIVA', 40, y);
   y += 22;
 
-  if (testType === 'PERSONALIDAD') {
+  if (testType !== 'CLIMA' && testType !== 'BURNOUT') {
     // Leyenda
     let lx = 40;
     doc.fontSize(9).font('Helvetica');

@@ -78,7 +78,7 @@ export function ConsolidatedDialog({ open, event, onClose }) {
           {comparativeInfo?.eligible && (
             <Button fullWidth variant="contained" color="primary" startIcon={downloading === 'comparative' ? <CircularProgress size={18} /> : <Assessment />}
               disabled={!!downloading} onClick={handleComparative}>
-              Reporte comparativo (últimos {comparativeInfo.count} eventos)
+              PDF Comparativo (últimos {comparativeInfo.count} eventos)
             </Button>
           )}
         </Box>

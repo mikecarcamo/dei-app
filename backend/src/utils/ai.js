@@ -152,6 +152,7 @@ async function generateComparativeAnalysis(testType, entityName, summaries) {
     CLIMA: 'Encuesta de Clima Laboral (ponderación porcentual por factor, escala 1-5)',
     BURNOUT: 'Cuestionario Burnout MBI (Cansancio Emocional, Despersonalización, Realización Personal)',
     PERSONALIDAD: 'Test de Personalidad de cuatro temperamentos (Sanguíneo, Colérico, Melancólico, Flemático)',
+    TEMPERAMENTO: 'Test de Personalidad de cuatro temperamentos (Sanguíneo, Colérico, Melancólico, Flemático)',
   }[testType] || testType;
 
   const lines = summaries.map(s => `- ${s.line}`).join('\n');
