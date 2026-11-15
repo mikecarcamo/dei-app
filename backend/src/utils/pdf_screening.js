@@ -116,7 +116,6 @@ function generateScreeningPDF(doc, { screening, patient, therapist, crisisResour
       y = heading(doc, y + 4, 'LIMITACIONES');
       y = paragraph(doc, y, ai.limitaciones, { align: 'justify' });
     }
-    y = paragraph(doc, y + 2, `Modelo: ${screening.ai_model || '—'} · Versión de prompt: ${screening.prompt_version || '—'}`, { size: 8, color: COLORS.muted });
   }
 
   if (screening.notes) {

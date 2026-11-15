@@ -259,9 +259,6 @@ export function ScreeningResult({ screening, onUpdated, canRegenerate = true }) 
                   <Typography variant="body2" sx={{ textAlign: 'justify' }}>{ai.limitaciones}</Typography>
                 </>
               )}
-              <Typography variant="caption" color="text.secondary" display="block" mt={1}>
-                Modelo: {screening.ai_model} · Prompt: {screening.prompt_version}
-              </Typography>
             </>
           )}
         </CardContent>
