@@ -212,20 +212,22 @@ function drawTherapistSignature(doc, y, therapist) {
   y = ensureSpace(doc, y + 30, 140);
   const w = 280;
   const x = (doc.page.width - w) / 2;
-  let nameY = y + 40;
-  let nameX = x;
   if (therapist.signature_image) {
     try {
-      doc.image(Buffer.from(therapist.signature_image.split(',')[1], 'base64'), x, y - 4, { fit: [w, 84], align: 'center' });
-      // El nombre se sobrepone a la parte baja de la firma (transparencia).
-      nameY = y + 62;
-      nameX = x + 10;
-    } catch (e) { /* imagen inválida: solo nombre */ }
+      const img = Buffer.from(therapist.signature_image.split(',')[1], 'base64');
+      // Primero el nombre (abajo a la izquierda), luego la firma montada encima.
+      doc.fontSize(12).font('Helvetica-Bold').fillColor(COLORS.text)
+        .text(therapist.full_name, x + 10, y + 58, { width: w - 20, align: 'left' });
+      doc.image(img, x, y - 4, { fit: [w, 84], align: 'center' });
+    } catch (e) {
+      doc.fontSize(11).font('Helvetica-Bold').fillColor(COLORS.text)
+        .text(therapist.full_name, x, y + 40, { width: w, align: 'center' });
+    }
   } else {
-    doc.moveTo(x + 30, nameY).lineTo(x + w - 30, nameY).strokeColor(COLORS.secondary).stroke();
-    nameY += 6;
+    doc.moveTo(x + 30, y + 40).lineTo(x + w - 30, y + 40).strokeColor(COLORS.secondary).stroke();
+    doc.fontSize(11).font('Helvetica-Bold').fillColor(COLORS.text)
+      .text(therapist.full_name, x, y + 46, { width: w, align: 'center' });
   }
-  doc.fontSize(12).font('Helvetica-Bold').fillColor(COLORS.text).text(therapist.full_name, nameX, nameY, { width: w - 20, align: 'left' });
 }
 
 module.exports = { generateScreeningPDF, generatePatientFichaPDF, DISCLAIMER };
