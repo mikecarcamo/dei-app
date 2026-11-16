@@ -461,6 +461,7 @@ router.get('/screenings/:id/pdf', verifyToken, requireTherapist, (req, res) => {
 
 const CLOSE_STATUSES = ['celebrada', 'cancelada_paciente', 'cancelada_terapeuta', 'anulada'];
 const CLOSE_LABELS = { celebrada: 'Celebrada', cancelada_paciente: 'Cancelada por paciente', cancelada_terapeuta: 'Cancelada por terapeuta', anulada: 'Anulada' };
+const APPT_CATEGORIES = ['PRESENCIAL_MENTAL_Z9', 'PRESENCIAL_DEI_Z1', 'VIRTUAL', 'LLAMADA'];
 
 function normalizeDT(v) {
   if (!v || typeof v !== 'string') return null;
@@ -525,10 +526,12 @@ router.post('/appointments', verifyToken, requireTherapist, requireLicense, (req
       ? `Se traslapa con la cita #${conflict.id} de ${conflict.patient_name} (${conflict.starts_at} - ${conflict.ends_at})`
       : `Se traslapa con un horario bloqueado (${conflict.starts_at} - ${conflict.ends_at}${conflict.reason ? `: ${conflict.reason}` : ''})`,
   });
+  const category = req.body.category || 'PRESENCIAL_MENTAL_Z9';
+  if (!APPT_CATEGORIES.includes(category)) return res.status(400).json({ message: 'Categoría de cita inválida' });
   const r = db.prepare(`
-    INSERT INTO appointments (therapist_id, patient_id, starts_at, ends_at, status, observaciones)
-    VALUES (?, ?, ?, ?, 'agendada', ?)
-  `).run(req.user.id, patient.id, startsAt, endsAt, req.body.observaciones || null);
+    INSERT INTO appointments (therapist_id, patient_id, starts_at, ends_at, status, observaciones, category)
+    VALUES (?, ?, ?, ?, 'agendada', ?, ?)
+  `).run(req.user.id, patient.id, startsAt, endsAt, req.body.observaciones || null, category);
   audit(req.user.id, 'CREATE_APPOINTMENT', 'appointment', r.lastInsertRowid, { patient_id: patient.id, starts_at: startsAt });
   res.status(201).json(db.prepare(`SELECT a.*, p.full_name AS patient_name, p.code AS patient_code FROM appointments a JOIN patients p ON p.id = a.patient_id WHERE a.id = ?`).get(r.lastInsertRowid));
 });

@@ -254,7 +254,7 @@ export default function Manual() {
             <MenuPath>Menú: Citas</MenuPath>
             <Steps steps={[
               { label: 'Vista de calendario', body: 'Botones superiores "Mes / Semana / Día" para cambiar la vista, y las flechas para navegar. También puede presionar un espacio vacío del calendario para crear una cita en ese horario.' },
-              { label: '"Nueva cita"', body: 'Seleccione el paciente de la lista o "+ Nuevo paciente…" para registrarlo ahí mismo. Indique "Fecha y hora" — la cita dura 1 hora automáticamente y queda en estado "Agendada". El sistema rechaza la cita si se traslapa con otra cita suya o con un horario bloqueado.' },
+              { label: '"Nueva cita"', body: 'Seleccione el paciente de la lista o "+ Nuevo paciente…" para registrarlo ahí mismo. Elija la Categoría (Presencial — MENTAL Zona 9, Presencial — DEI Zona 1, Virtual o Llamada telefónica) e indique "Fecha y hora" — la cita dura 1 hora automáticamente y queda en estado "Agendada". El sistema rechaza la cita si se traslapa con otra cita suya o con un horario bloqueado.' },
               { label: '"Bloquear horario"', body: 'Marque el rango "Desde / Hasta" (fechas y horas) y un motivo opcional (vacaciones, congreso…). En ese rango no se pueden agendar citas. El bloqueo aparece en gris en el calendario; para quitarlo presiónelo y elija "Quitar bloqueo".' },
               { label: 'Presione una cita para ver su detalle', body: 'Se muestran paciente, horario, estado y notas. Si está "Agendada" también puede reprogramarla escribiendo la nueva fecha y hora en "Reprogramar" y presionando "Mover" (mismas reglas de traslape).' },
               { label: '"Registrar atención"', body: 'En el detalle de una cita agendada. Elija el cierre:', extra: (

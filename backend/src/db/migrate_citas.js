@@ -33,4 +33,8 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_blocks_therapist ON therapist_blocks(therapist_id, starts_at);
 `);
 
+if (!db.pragma('table_info(appointments)').some(c => c.name === 'category')) {
+  db.exec(`ALTER TABLE appointments ADD COLUMN category TEXT NOT NULL DEFAULT 'PRESENCIAL_MENTAL_Z9'`);
+}
+
 console.log('Migración Citas completada.');

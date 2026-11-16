@@ -24,6 +24,14 @@ const STATUS_COLORS = {
   agendada: '#1565C0', celebrada: '#2E7D32',
   cancelada_paciente: '#EF6C00', cancelada_terapeuta: '#EF6C00', anulada: '#757575',
 };
+const CATEGORIES = [
+  { value: 'PRESENCIAL_MENTAL_Z9', label: 'Presencial — MENTAL Zona 9' },
+  { value: 'PRESENCIAL_DEI_Z1', label: 'Presencial — DEI Zona 1' },
+  { value: 'VIRTUAL', label: 'Virtual' },
+  { value: 'LLAMADA', label: 'Llamada telefónica' },
+];
+const CATEGORY_LABELS = Object.fromEntries(CATEGORIES.map(c => [c.value, c.label]));
+
 const CAL_MESSAGES = {
   today: 'Hoy', previous: 'Anterior', next: 'Siguiente', month: 'Mes', week: 'Semana', day: 'Día',
   agenda: 'Agenda', date: 'Fecha', time: 'Hora', event: 'Cita', noEventsInRange: 'No hay citas en este período',
@@ -35,6 +43,7 @@ const fmtDT = (s) => dayjs(s, 'YYYY-MM-DD HH:mm').format('DD/MM/YYYY HH:mm');
 
 function NewAppointmentDialog({ open, patients, initialSlot, onClose, onSaved }) {
   const [patientId, setPatientId] = useState('');
+  const [category, setCategory] = useState('PRESENCIAL_MENTAL_Z9');
   const [start, setStart] = useState('');
   const [obs, setObs] = useState('');
   const [newPatientOpen, setNewPatientOpen] = useState(false);
@@ -43,7 +52,7 @@ function NewAppointmentDialog({ open, patients, initialSlot, onClose, onSaved })
 
   useEffect(() => {
     if (open) {
-      setPatientId(''); setObs(''); setError('');
+      setPatientId(''); setCategory('PRESENCIAL_MENTAL_Z9'); setObs(''); setError('');
       setStart(initialSlot ? dayjs(initialSlot).format('YYYY-MM-DDTHH:mm') : '');
     }
   }, [open, initialSlot]);
@@ -55,7 +64,7 @@ function NewAppointmentDialog({ open, patients, initialSlot, onClose, onSaved })
     if (!start) { setError('Indique la fecha y hora de la cita'); return; }
     setLoading(true); setError('');
     try {
-      await api.post('/therapy/appointments', { patient_id: patientId, starts_at: start, observaciones: obs || undefined });
+      await api.post('/therapy/appointments', { patient_id: patientId, starts_at: start, category, observaciones: obs || undefined });
       onSaved();
     } catch (e) {
       setError(e.response?.data?.message || 'Error al crear la cita');
@@ -78,6 +87,12 @@ function NewAppointmentDialog({ open, patients, initialSlot, onClose, onSaved })
             }}>
               {patients.map(p => <MenuItem key={p.id} value={p.id}>{p.code} — {p.full_name}</MenuItem>)}
               <MenuItem value="__new__"><em>+ Nuevo paciente…</em></MenuItem>
+            </Select>
+          </FormControl>
+          <FormControl fullWidth margin="normal">
+            <InputLabel>Categoría *</InputLabel>
+            <Select value={category} label="Categoría *" onChange={e => setCategory(e.target.value)}>
+              {CATEGORIES.map(c => <MenuItem key={c.value} value={c.value}>{c.label}</MenuItem>)}
             </Select>
           </FormControl>
           <Box display="flex" gap={2} alignItems="flex-start">
@@ -256,6 +271,7 @@ function DetailDialog({ open, item, onClose, onClose_appt, onReschedule, onDelet
       <DialogContent>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
         <Typography variant="body2"><b>Paciente:</b> {a.patient_name} ({a.patient_code})</Typography>
+        <Typography variant="body2"><b>Categoría:</b> {CATEGORY_LABELS[a.category] || a.category || '—'}</Typography>
         <Typography variant="body2"><b>Fecha y hora:</b> {fmtDT(a.starts_at)} — {fmtDT(a.ends_at)}</Typography>
         <Typography variant="body2"><b>Estado:</b> <Chip size="small" label={STATUS_LABELS[a.status]} sx={{ bgcolor: STATUS_COLORS[a.status], color: 'white' }} /></Typography>
         {a.situacion_actual && <Typography variant="body2" mt={1}><b>Situación actual:</b> {a.situacion_actual}</Typography>}
@@ -319,7 +335,7 @@ export default function Appointments() {
   const events = useMemo(() => [
     ...appointments.map(a => ({
       id: `a${a.id}`, type: 'appt', appt: a,
-      title: `${a.patient_name}`,
+      title: `${a.patient_name} · ${CATEGORY_LABELS[a.category] || ''}`,
       start: parseDT(a.starts_at), end: parseDT(a.ends_at),
     })),
     ...blocks.map(b => ({
