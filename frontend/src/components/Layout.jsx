@@ -8,7 +8,7 @@ import {
 import {
   Menu as MenuIcon, Dashboard, People, Business, Assignment,
   Event, VpnKey, Assessment, Logout, Psychology, AdminPanelSettings,
-  LockReset, BarChart, MedicalServices, FactCheck, PersonSearch, HealthAndSafety,
+  LockReset, BarChart, MedicalServices, FactCheck, PersonSearch, HealthAndSafety, Draw,
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 
@@ -41,6 +41,7 @@ const therapistMenuItems = [
   { label: 'Terapeuta', icon: <MedicalServices />, children: [
     { label: 'Tamizaje', icon: <FactCheck />, path: '/terapeuta/tamizaje' },
     { label: 'Pacientes', icon: <PersonSearch />, path: '/terapeuta/pacientes' },
+    { label: 'Firma y Sello', icon: <Draw />, path: '/terapeuta/firma' },
   ] },
 ];
 

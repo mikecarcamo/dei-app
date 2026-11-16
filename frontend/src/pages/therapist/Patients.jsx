@@ -4,7 +4,7 @@ import {
   Box, Typography, Button, Card, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   IconButton, Tooltip, CircularProgress, TextField, InputAdornment,
 } from '@mui/material';
-import { PersonAdd, Search, History, FactCheck, Description, Link as LinkIcon, Draw } from '@mui/icons-material';
+import { PersonAdd, Search, History, FactCheck, Description, Link as LinkIcon } from '@mui/icons-material';
 import { Chip, Dialog, DialogTitle, DialogContent, DialogActions, FormControlLabel, Checkbox, Alert } from '@mui/material';
 import api from '../../api/axios';
 import PdfViewerModal, { openOrDownloadPdf } from '../../components/PdfViewerModal';
@@ -29,30 +29,6 @@ export default function Patients() {
   const [linkSelected, setLinkSelected] = useState({ PHQ9: true, GAD7: true, PCL5: false, CSSRS: false });
   const [linkUrl, setLinkUrl] = useState('');
   const [linkError, setLinkError] = useState('');
-  const [signOpen, setSignOpen] = useState(false);
-  const [signPreview, setSignPreview] = useState(null);
-  const [signMsg, setSignMsg] = useState('');
-
-  const saveSignature = async () => {
-    if (!signPreview) { setSignMsg('Seleccione una imagen'); return; }
-    try {
-      await api.post('/therapy/me/signature', { image: signPreview });
-      setSignMsg('Firma guardada. Se usará en los PDF de tamizaje y ficha.');
-    } catch (e) { setSignMsg(e.response?.data?.message || 'No se pudo guardar'); }
-  };
-
-  const removeSignature = async () => {
-    await api.delete('/therapy/me/signature');
-    setSignPreview(null); setSignMsg('Firma eliminada.');
-  };
-
-  const onPickImage = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setSignPreview(reader.result);
-    reader.readAsDataURL(file);
-  };
 
   const openFicha = async (p) => {
     const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
@@ -94,10 +70,7 @@ export default function Patients() {
           <Typography variant="h5" fontWeight={700} color="primary.main">Pacientes</Typography>
           <Typography variant="body2" color="text.secondary">Registro de pacientes e historial de tamizajes</Typography>
         </Box>
-        <Box display="flex" gap={1}>
-          <Button variant="outlined" startIcon={<Draw />} onClick={() => { setSignOpen(true); setSignMsg(''); }}>Mi firma</Button>
-          <Button variant="contained" startIcon={<PersonAdd />} onClick={() => setDialog(true)} disabled={!license?.active}>Nuevo paciente</Button>
-        </Box>
+        <Button variant="contained" startIcon={<PersonAdd />} onClick={() => setDialog(true)} disabled={!license?.active}>Nuevo paciente</Button>
       </Box>
 
       <LicenseBanner license={license} />
@@ -174,30 +147,6 @@ export default function Patients() {
           {!linkUrl
             ? <Button variant="contained" onClick={generateLink}>Generar link</Button>
             : <Button variant="contained" onClick={() => navigator.clipboard.writeText(linkUrl)}>Copiar link</Button>}
-        </DialogActions>
-      </Dialog>
-
-      <Dialog open={signOpen} onClose={() => setSignOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Mi firma y sello</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" mb={1.5}>
-            Sube la imagen de tu firma con sello (PNG o JPG). Aparecerá al final de los PDF de tamizaje y ficha junto a tu nombre.
-          </Typography>
-          <Button variant="outlined" component="label" fullWidth sx={{ mb: 1 }}>
-            Seleccionar imagen
-            <input type="file" accept="image/png,image/jpeg" hidden onChange={onPickImage} />
-          </Button>
-          {signPreview && (
-            <Box textAlign="center" sx={{ border: '1px dashed #CCC', borderRadius: 2, p: 1 }}>
-              <img src={signPreview} alt="Firma" style={{ maxWidth: '100%', maxHeight: 120 }} />
-            </Box>
-          )}
-          {signMsg && <Alert severity={signMsg.includes('guardada') || signMsg.includes('eliminada') ? 'success' : 'error'} sx={{ mt: 1 }}>{signMsg}</Alert>}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={removeSignature} color="error">Eliminar</Button>
-          <Button onClick={() => setSignOpen(false)}>Cerrar</Button>
-          <Button variant="contained" onClick={saveSignature}>Guardar</Button>
         </DialogActions>
       </Dialog>
 

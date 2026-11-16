@@ -27,6 +27,7 @@ import PublicScreening from './pages/PublicScreening';
 import Screening from './pages/therapist/Screening';
 import Patients from './pages/therapist/Patients';
 import PatientDetail from './pages/therapist/PatientDetail';
+import Signature from './pages/therapist/Signature';
 
 const theme = createTheme({
   palette: {
@@ -116,6 +117,7 @@ export default function App() {
                 <Route path="/terapeuta/tamizaje" element={<Screening />} />
                 <Route path="/terapeuta/pacientes" element={<Patients />} />
                 <Route path="/terapeuta/pacientes/:id" element={<PatientDetail />} />
+                <Route path="/terapeuta/firma" element={<Signature />} />
               </Route>
             </Route>
 
