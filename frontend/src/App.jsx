@@ -24,6 +24,7 @@ import EmpresaEvents from './pages/admin/EmpresaEvents';
 import Therapists from './pages/admin/Therapists';
 
 import PublicScreening from './pages/PublicScreening';
+import Manual from './pages/Manual';
 import Screening from './pages/therapist/Screening';
 import Patients from './pages/therapist/Patients';
 import PatientDetail from './pages/therapist/PatientDetail';
@@ -88,6 +89,7 @@ export default function App() {
               <Route element={<UserLayout />}>
                 <Route path="/" element={<HomeRoute />} />
                 <Route path="/test/:eventId" element={<TestForm />} />
+                <Route path="/manual" element={<Manual />} />
               </Route>
             </Route>
 
@@ -98,6 +100,7 @@ export default function App() {
                 <Route path="/admin/users" element={<Users />} />
                 <Route path="/admin/my-events" element={<EmpresaEvents />} />
                 <Route path="/my-results" element={<MyResults />} />
+                <Route path="/manual" element={<Manual />} />
               </Route>
             </Route>
             <Route element={<ProtectedRoute roles={['ADMIN']} />}>

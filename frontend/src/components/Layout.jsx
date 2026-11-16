@@ -8,7 +8,7 @@ import {
 import {
   Menu as MenuIcon, Dashboard, People, Business, Assignment,
   Event, VpnKey, Assessment, Logout, Psychology, AdminPanelSettings,
-  LockReset, BarChart, MedicalServices, PersonSearch, HealthAndSafety, Draw,
+  LockReset, BarChart, MedicalServices, PersonSearch, HealthAndSafety, Draw, MenuBook,
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 
@@ -135,6 +135,12 @@ export default function Layout({ isAdmin = false }) {
           <ListItemButton onClick={() => navigate('/change-password')} sx={{ mx: 1, borderRadius: 2, '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
             <ListItemIcon sx={{ color: 'rgba(255,255,255,0.7)', minWidth: 40 }}><LockReset /></ListItemIcon>
             <ListItemText primary="Cambiar Contraseña" primaryTypographyProps={{ fontSize: 14, color: 'rgba(255,255,255,0.85)' }} />
+          </ListItemButton>
+        </ListItem>
+        <ListItem disablePadding>
+          <ListItemButton onClick={() => navigate('/manual')} sx={{ mx: 1, borderRadius: 2, '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
+            <ListItemIcon sx={{ color: 'rgba(255,255,255,0.7)', minWidth: 40 }}><MenuBook /></ListItemIcon>
+            <ListItemText primary="Manual de Usuario" primaryTypographyProps={{ fontSize: 14, color: 'rgba(255,255,255,0.85)' }} />
           </ListItemButton>
         </ListItem>
         <ListItem disablePadding>
