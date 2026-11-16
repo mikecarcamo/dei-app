@@ -1,9 +1,30 @@
 const PDFDocument = require('pdfkit');
 const path = require('path');
 const { TEMPERAMENT_LABELS } = require('./scoring');
+const { timestampGT } = require('./dates');
 
 const FIRMA_PATH = path.join(__dirname, 'FIRMASELLOMICH.png');
 const LOGO_PATH = path.join(__dirname, 'Logo.png');
+
+// Fecha/hora en formato dd/mm/yyyy hh:mm (24h)
+function fmtDateTimeGT(value) {
+  if (!value) return '—';
+  const d = new Date(String(value).replace(' ', 'T'));
+  if (isNaN(d)) return '—';
+  const p = n => String(n).padStart(2, '0');
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function fmtDateGT(value) {
+  if (!value) return '—';
+  const s = String(value);
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+  const d = new Date(s.replace(' ', 'T'));
+  if (isNaN(d)) return '—';
+  const p = n => String(n).padStart(2, '0');
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`;
+}
 
 function drawWatermark(doc) {
   const w = 300;
@@ -162,7 +183,7 @@ function drawBurnoutAnswersDetail(doc, y, answers) {
 function generateBurnoutPDF(doc, response, event, answers) {
   const entityName = event.entity_name || '—';
   const submittedStr = response.submitted_at ? response.submitted_at.replace(' ', 'T') : null;
-  const submittedAt = submittedStr ? new Date(submittedStr).toLocaleString('es-GT', { dateStyle: 'long', timeStyle: 'short' }) : '—';
+  const submittedAt = fmtDateTimeGT(submittedStr);
 
   markDarkPage(doc);
   doc.rect(0, 0, doc.page.width, 90).fill(COLORS.burnout);
@@ -231,7 +252,7 @@ function generateIndividualPDF(doc, response, event, answers) {
 
   const entityName = event.entity_name || '—';
   const submittedStr = response.submitted_at ? response.submitted_at.replace(' ', 'T') : null;
-  const submittedAt = submittedStr ? new Date(submittedStr).toLocaleString('es-GT', { dateStyle: 'long', timeStyle: 'short' }) : '—';
+  const submittedAt = fmtDateTimeGT(submittedStr);
 
   let y = drawHeader(doc, 'Test de Personalidad - Resultado Individual', 'Sistema de Evaluación DEI');
 
@@ -311,7 +332,7 @@ function generateIndividualPDF(doc, response, event, answers) {
 }
 
 function drawEventDataSection(doc, y, event, responses, headerColor) {
-  const generatedAt = new Date().toLocaleString('es-GT', { dateStyle: 'long', timeStyle: 'short' });
+  const generatedAt = fmtDateTimeGT(timestampGT());
   doc.fontSize(13).font('Helvetica-Bold').fillColor(headerColor).text('DATOS DEL EVENTO', 40, y);
   y += 20;
   y = drawSection(doc, y, 'Evento:', event.name);
@@ -330,7 +351,7 @@ function drawEventDataSection(doc, y, event, responses, headerColor) {
 function formatFecha(str) {
   if (!str) return '—';
   const s = str.replace(' ', 'T');
-  return new Date(s).toLocaleDateString('es-GT');
+  return fmtDateGT(s);
 }
 
 function drawAnswersDetail(doc, ay, answers) {
@@ -494,7 +515,7 @@ function generateConsolidatedPDF(doc, event, responses, includeDetail = false, i
           .text(event.name, 40, 56, { align: 'center', width: doc.page.width - 80 });
         doc.fillColor(COLORS.text);
         let dy = 110;
-        const fechaLlenadoB = r.submitted_at ? new Date(r.submitted_at.replace(' ', 'T')).toLocaleString('es-GT', { dateStyle: 'long', timeStyle: 'short' }) : '—';
+        const fechaLlenadoB = fmtDateTimeGT(r.submitted_at);
         dy = drawSection(doc, dy, 'Fecha de llenado:', fechaLlenadoB);
         dy += 5;
         dy = drawBurnoutBar(doc, dy, 'Cansancio Emocional:', r.burnout_ce ?? 0, 54, r.burnout_ce_nivel || 'BAJO');
@@ -592,7 +613,7 @@ function generateConsolidatedPDF(doc, event, responses, includeDetail = false, i
       doc.addPage();
       let dy = drawHeader(doc, r.participant_full_name, event.name);
       dy += 5;
-      const fechaLlenado = r.submitted_at ? new Date(r.submitted_at.replace(' ', 'T')).toLocaleString('es-GT', { dateStyle: 'long', timeStyle: 'short' }) : '—';
+      const fechaLlenado = fmtDateTimeGT(r.submitted_at);
       dy = drawSection(doc, dy, 'Fecha de llenado:', fechaLlenado);
       dy = drawSection(doc, dy, 'Temperamento Dom.:', (r.dominant_temperament || '').replace('SANGUINEO', 'Sanguíneo').replace('COLERICO', 'Colérico').replace('MELANCOLICO', 'Melancólico').replace('FLEMATICO', 'Flemático'));
       dy = drawSection(doc, dy, 'Temperamento Sec.:', (r.secondary_temperament || '').replace('SANGUINEO', 'Sanguíneo').replace('COLERICO', 'Colérico').replace('MELANCOLICO', 'Melancólico').replace('FLEMATICO', 'Flemático'));
@@ -769,7 +790,7 @@ function generateClimaConsolidatedPDF(doc, event, indicatorStats, factorStats, r
     doc.text(String(i + 1), pColX[0], y + 3, { width: pColW[0] });
     doc.font('Helvetica-Bold').text(r.participant_full_name || '—', pColX[1], y + 3, { width: pColW[1] });
     doc.text(`${(r.clima_score || 0).toFixed(2)}%`, pColX[2], y + 3, { width: pColW[2] });
-    const fecha = r.submitted_at ? new Date(r.submitted_at.replace(' ', 'T')).toLocaleString('es-GT', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+    const fecha = fmtDateTimeGT(r.submitted_at);
     doc.fontSize(8).text(fecha, pColX[3], y + 3, { width: pColW[3] });
     y += 16;
   });
@@ -790,7 +811,7 @@ function generateClimaIndividualPDF(doc, response, event, answers) {
   if (event.target_audience) y = drawSection(doc, y, 'Dirigido a:', event.target_audience);
   y = drawSection(doc, y, 'Código de participación:', response.participant_full_name);
   y = drawSection(doc, y, 'Ponderación general:', `${(response.clima_score || 0).toFixed(2)}%`);
-  const fecha = response.submitted_at ? new Date(response.submitted_at.replace(' ', 'T')).toLocaleString('es-GT', { dateStyle: 'long', timeStyle: 'short' }) : '—';
+  const fecha = fmtDateTimeGT(response.submitted_at);
   y = drawSection(doc, y, 'Fecha:', fecha);
   y += 5;
   doc.fontSize(10).font('Helvetica-Oblique').fillColor(COLORS.muted)

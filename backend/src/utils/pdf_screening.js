@@ -4,9 +4,13 @@ const { INSTRUMENTS } = require('./screening');
 const DISCLAIMER = 'Este tamizaje es una herramienta de apoyo y NO constituye un diagnóstico. Requiere evaluación y criterio de un profesional de salud mental.';
 const SUPPORT_LABEL = { alto: 'Alto', medio: 'Medio', bajo: 'Bajo' };
 
+// dd/mm/yyyy hh:mm (24h)
 function fmtDateTime(str) {
   if (!str) return '—';
-  return new Date(str.replace(' ', 'T')).toLocaleString('es-GT', { dateStyle: 'long', timeStyle: 'short' });
+  const d = new Date(String(str).replace(' ', 'T'));
+  if (isNaN(d)) return '—';
+  const p = n => String(n).padStart(2, '0');
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
 function ensureSpace(doc, y, needed = 80) {
