@@ -142,4 +142,8 @@ const scrCols = db.pragma('table_info(screenings)').map(c => c.name);
 if (!scrCols.includes('source')) db.exec(`ALTER TABLE screenings ADD COLUMN source TEXT NOT NULL DEFAULT 'terapeuta'`);
 if (!scrCols.includes('viewed_at')) db.exec(`ALTER TABLE screenings ADD COLUMN viewed_at TEXT`);
 
+// 4. Firma y sello por terapeuta (imagen en data URL)
+const userCols = db.pragma('table_info(users)').map(c => c.name);
+if (!userCols.includes('signature_image')) db.exec(`ALTER TABLE users ADD COLUMN signature_image TEXT`);
+
 console.log('Migración Terapeutas completada.');

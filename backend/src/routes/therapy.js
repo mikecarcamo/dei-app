@@ -212,7 +212,25 @@ router.put('/admin/settings/crisis', verifyToken, requireAdmin, [
 router.get('/me/license', verifyToken, requireTherapist, (req, res) => {
   const active = getActiveLicense(req.user.id);
   const latest = db.prepare(`SELECT * FROM therapist_licenses WHERE user_id = ? ORDER BY valid_to DESC LIMIT 1`).get(req.user.id);
-  res.json({ active: !!active, license: active || latest || null, today: todayGT() });
+  const me = db.prepare(`SELECT signature_image FROM users WHERE id = ?`).get(req.user.id);
+  res.json({ active: !!active, license: active || latest || null, today: todayGT(), signature_image: me?.signature_image || null });
+});
+
+// Firma y sello del terapeuta (data URL PNG/JPG, se usa en los PDF).
+const SIGNATURE_RE = /^data:image\/(png|jpe?g);base64,/;
+router.post('/me/signature', verifyToken, requireTherapist, (req, res) => {
+  const image = String(req.body.image || '');
+  if (!SIGNATURE_RE.test(image)) return res.status(400).json({ message: 'La imagen debe ser PNG o JPG' });
+  if (image.length > 1_400_000) return res.status(400).json({ message: 'La imagen es demasiado grande (máx. ~1 MB)' });
+  db.prepare(`UPDATE users SET signature_image = ? WHERE id = ?`).run(image, req.user.id);
+  audit(req.user.id, 'UPDATE_SIGNATURE', 'user', req.user.id, null);
+  res.json({ ok: true });
+});
+
+router.delete('/me/signature', verifyToken, requireTherapist, (req, res) => {
+  db.prepare(`UPDATE users SET signature_image = NULL WHERE id = ?`).run(req.user.id);
+  audit(req.user.id, 'DELETE_SIGNATURE', 'user', req.user.id, null);
+  res.json({ ok: true });
 });
 
 router.get('/instruments', verifyToken, requireTherapist, (req, res) => {
@@ -296,7 +314,7 @@ router.get('/patients/:id/ficha.pdf', verifyToken, requireTherapist, (req, res) 
   const patient = ownPatient(req, res);
   if (!patient) return;
   const screenings = db.prepare(`SELECT * FROM screenings WHERE patient_id = ? ORDER BY screened_at, id`).all(patient.id).map(parseScreening);
-  const therapist = db.prepare(`SELECT full_name FROM users WHERE id = ?`).get(req.user.id);
+  const therapist = db.prepare(`SELECT full_name, signature_image FROM users WHERE id = ?`).get(req.user.id);
   audit(req.user.id, 'EXPORT_FICHA', 'patient', patient.id, null);
 
   const doc = new PDFDocument({ margin: 40, size: 'LETTER', bufferPages: true });
@@ -424,7 +442,7 @@ router.get('/screenings/:id/pdf', verifyToken, requireTherapist, (req, res) => {
   const s = ownScreening(req, res);
   if (!s) return;
   const patient = db.prepare(`SELECT * FROM patients WHERE id = ?`).get(s.patient_id);
-  const therapist = db.prepare(`SELECT full_name FROM users WHERE id = ?`).get(s.therapist_id);
+  const therapist = db.prepare(`SELECT full_name, signature_image FROM users WHERE id = ?`).get(s.therapist_id);
   audit(req.user.id, 'EXPORT_SCREENING_PDF', 'screening', s.id, null);
 
   const doc = new PDFDocument({ margin: 40, size: 'LETTER', bufferPages: true });

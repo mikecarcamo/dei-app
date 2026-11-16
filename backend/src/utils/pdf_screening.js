@@ -144,12 +144,7 @@ function generateScreeningPDF(doc, { screening, patient, therapist, crisisResour
   }
 
   // Firma del terapeuta
-  y = ensureSpace(doc, y + 30, 80);
-  const lineW = 220;
-  const x = (doc.page.width - lineW) / 2;
-  doc.moveTo(x, y + 40).lineTo(x + lineW, y + 40).strokeColor(COLORS.secondary).stroke();
-  doc.fontSize(10).font('Helvetica-Bold').fillColor(COLORS.text).text(therapist.full_name, x, y + 46, { width: lineW, align: 'center' });
-  doc.fontSize(9).font('Helvetica').fillColor(COLORS.muted).text('Firma y sello del profesional', x, y + 60, { width: lineW, align: 'center' });
+  drawTherapistSignature(doc, y, therapist);
 }
 
 const SEX_LABEL = { F: 'Femenino', M: 'Masculino', O: 'Otro' };
@@ -209,13 +204,24 @@ function generatePatientFichaPDF(doc, { patient, therapist, screenings }) {
   y = ensureSpace(doc, y + 6, 60);
   y = drawBox(doc, y, DISCLAIMER, '#FFFDE7', '#F9A825');
 
-  // Firma del terapeuta
-  y = ensureSpace(doc, y + 30, 80);
+  drawTherapistSignature(doc, y, therapist);
+}
+
+// Firma y sello: imagen del terapeuta (si la subió) sobre la línea + nombre completo.
+function drawTherapistSignature(doc, y, therapist) {
+  y = ensureSpace(doc, y + 30, 120);
   const lineW = 220;
   const x = (doc.page.width - lineW) / 2;
-  doc.moveTo(x, y + 40).lineTo(x + lineW, y + 40).strokeColor(COLORS.secondary).stroke();
-  doc.fontSize(10).font('Helvetica-Bold').fillColor(COLORS.text).text(therapist.full_name, x, y + 46, { width: lineW, align: 'center' });
-  doc.fontSize(9).font('Helvetica').fillColor(COLORS.muted).text('Firma y sello del profesional', x, y + 60, { width: lineW, align: 'center' });
+  let lineY = y + 40;
+  if (therapist.signature_image) {
+    try {
+      doc.image(Buffer.from(therapist.signature_image.split(',')[1], 'base64'), x, y - 6, { fit: [lineW, 56], align: 'center' });
+      lineY = y + 52;
+    } catch (e) { /* imagen inválida: solo línea y nombre */ }
+  }
+  doc.moveTo(x, lineY).lineTo(x + lineW, lineY).strokeColor(COLORS.secondary).stroke();
+  doc.fontSize(10).font('Helvetica-Bold').fillColor(COLORS.text).text(therapist.full_name, x, lineY + 6, { width: lineW, align: 'center' });
+  doc.fontSize(9).font('Helvetica').fillColor(COLORS.muted).text('Firma y sello del profesional', x, lineY + 20, { width: lineW, align: 'center' });
 }
 
 module.exports = { generateScreeningPDF, generatePatientFichaPDF, DISCLAIMER };
