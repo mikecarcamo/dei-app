@@ -38,11 +38,8 @@ function processSignature(dataUrl, threshold = 235) {
       }
       if (maxX <= minX || maxY <= minY) return reject(new Error('La imagen quedó vacía al quitar el fondo'));
       const cw = maxX - minX + 1, ch = maxY - minY + 1;
-      if (cw < TARGET_W || ch < TARGET_H) {
-        return reject(new Error(`La firma debe medir al menos ${TARGET_W}x${TARGET_H} px (detectado: ${cw}x${ch})`));
-      }
 
-      // Escalar a 280x84 conservando proporción (encajar)
+      // Comprimir a 280x84 conservando proporción (encajar), sin importar el tamaño original
       const scale = Math.min(TARGET_W / cw, TARGET_H / ch);
       const dw = Math.round(cw * scale), dh = Math.round(ch * scale);
       const out = document.createElement('canvas');
@@ -117,8 +114,8 @@ export default function Signature() {
       <Card sx={{ borderRadius: 3, boxShadow: 2, mb: 2 }}>
         <CardContent>
           <Button variant="outlined" component="label" startIcon={<Upload />} sx={{ mb: 2 }}>
-            Seleccionar imagen (PNG o JPG)
-            <input type="file" accept="image/png,image/jpeg" hidden onChange={onPick} />
+            Seleccionar imagen
+            <input type="file" accept="image/*" hidden onChange={onPick} />
           </Button>
 
           {original && (
