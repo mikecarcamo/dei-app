@@ -63,7 +63,7 @@ function AdminLayout() {
 
 function HomeRoute() {
   const { user } = useAuth();
-  if (user?.role === 'TERAPEUTA') return <Navigate to="/terapeuta/tamizaje" replace />;
+  if (user?.role === 'TERAPEUTA') return <Navigate to="/terapeuta/pacientes" replace />;
   return <Dashboard />;
 }
 
