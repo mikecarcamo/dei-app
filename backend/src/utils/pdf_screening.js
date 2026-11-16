@@ -160,9 +160,11 @@ function generateScreeningPDF(doc, { screening, patient, therapist, crisisResour
 
 const SEX_LABEL = { F: 'Femenino', M: 'Masculino', O: 'Otro' };
 const SHORT_INST = { PHQ9: 'PHQ-9', GAD7: 'GAD-7', PCL5: 'PCL-5', CSSRS: 'C-SSRS' };
+const APPT_STATUS = { agendada: 'Agendada', celebrada: 'Celebrada', cancelada_paciente: 'Cancelada por paciente', cancelada_terapeuta: 'Cancelada por terapeuta', anulada: 'Anulada' };
+const APPT_CATEGORY = { PRESENCIAL_MENTAL_Z9: 'Presencial — MENTAL Zona 9', PRESENCIAL_DEI_Z1: 'Presencial — DEI Zona 1', VIRTUAL: 'Virtual', LLAMADA: 'Llamada telefónica' };
 
 // Ficha del paciente: datos generales + historial resumido de tamizajes (sin análisis de IA).
-function generatePatientFichaPDF(doc, { patient, therapist, screenings }) {
+function generatePatientFichaPDF(doc, { patient, therapist, screenings, appointments = [] }) {
   let y = drawHeader(doc, 'Ficha de Paciente', `Expediente ${patient.code}`);
   const rows = [
     ['Código de paciente:', patient.code],
@@ -209,6 +211,33 @@ function generatePatientFichaPDF(doc, { patient, therapist, screenings }) {
     doc.rect(40, y, 4, h).fill(s.risk_alert ? '#C62828' : COLORS.primary);
     doc.rect(44, y, doc.page.width - 84, h).fill('#F7F9FC');
     doc.fillColor(COLORS.text).text(text, 56, y + 7, { width: doc.page.width - 110 });
+    y += h + 8;
+  }
+
+  y += 4;
+  y = heading(doc, y, 'HISTORIAL DE CITAS');
+  if (!appointments.length) {
+    y = paragraph(doc, y, 'El paciente aún no registra citas.', { color: COLORS.muted });
+  }
+  for (const a of appointments) {
+    const clinica = a.status === 'celebrada'
+      ? [['Situación actual', a.situacion_actual], ['Desarrollo', a.desarrollo], ['Plan de trabajo', a.plan_trabajo]]
+          .filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join('\n')
+      : null;
+    const lines = [
+      `#${a.id} · ${fmtDateTime(a.starts_at)} – ${fmtDateTime(a.ends_at).slice(-5)} · ${APPT_CATEGORY[a.category] || a.category || '—'} · Estado: ${APPT_STATUS[a.status] || a.status}`,
+      clinica || null,
+      a.observaciones ? `Observaciones: ${a.observaciones}` : null,
+      a.documents_count > 0 ? `Documentos adjuntos: ${a.documents_count}` : null,
+    ].filter(Boolean).join('\n');
+
+    doc.fontSize(9).font('Helvetica');
+    const h = doc.heightOfString(lines, { width: doc.page.width - 110 }) + 14;
+    y = ensureSpace(doc, y, h + 10);
+    const barColor = a.status === 'celebrada' ? '#2E7D32' : a.status === 'agendada' ? COLORS.primary : a.status === 'anulada' ? '#757575' : '#EF6C00';
+    doc.rect(40, y, 4, h).fill(barColor);
+    doc.rect(44, y, doc.page.width - 84, h).fill('#F7F9FC');
+    doc.fillColor(COLORS.text).text(lines, 56, y + 7, { width: doc.page.width - 110 });
     y += h + 8;
   }
 

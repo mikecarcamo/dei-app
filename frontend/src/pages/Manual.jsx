@@ -243,8 +243,8 @@ export default function Manual() {
               { icon: <LinkIcon fontSize="small" />, label: 'Generar link' },
             ]} />
             <ul style={{ margin: '4px 0', paddingLeft: 8 }}>
-              <Li><b>Ficha:</b> PDF con datos del paciente y el resumen de todos sus tamizajes (fechas, puntajes, riesgo).</Li>
-              <Li><b>Historial:</b> abre el expediente: datos + cada tamizaje con su resultado y PDF individual.</Li>
+              <Li><b>Ficha:</b> PDF con datos del paciente, el resumen de todos sus tamizajes (fechas, puntajes, riesgo) y el historial de citas (fecha, categoría, estado, campos clínicos y documentos adjuntos).</Li>
+              <Li><b>Historial:</b> abre el expediente: datos + cada tamizaje con su resultado y PDF individual, más la tabla "Historial de citas" con el detalle de cada cita.</Li>
               <Li><b>Nuevo tamizaje:</b> el formulario que usted llena (ver sección anterior).</Li>
               <Li><b>Link:</b> genera el link de un solo uso para que el paciente responda solo.</Li>
             </ul>

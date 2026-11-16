@@ -11,6 +11,14 @@ import { PatientDialog, ScreeningResult, LicenseBanner, useTherapistLicense, fmt
 
 const SEX = { F: 'Femenino', M: 'Masculino', O: 'Otro' };
 const SHORT = { PHQ9: 'PHQ-9', GAD7: 'GAD-7', PCL5: 'PCL-5', CSSRS: 'C-SSRS' };
+const APPT_STATUS = {
+  agendada: { label: 'Agendada', color: 'primary' },
+  celebrada: { label: 'Celebrada', color: 'success' },
+  cancelada_paciente: { label: 'Cancelada por paciente', color: 'warning' },
+  cancelada_terapeuta: { label: 'Cancelada por terapeuta', color: 'warning' },
+  anulada: { label: 'Anulada', color: 'default' },
+};
+const APPT_CAT = { PRESENCIAL_MENTAL_Z9: 'Presencial — MENTAL Z9', PRESENCIAL_DEI_Z1: 'Presencial — DEI Z1', VIRTUAL: 'Virtual', LLAMADA: 'Llamada telefónica' };
 
 export default function PatientDetail() {
   const { id } = useParams();
@@ -20,6 +28,7 @@ export default function PatientDetail() {
   const [error, setError] = useState('');
   const [editOpen, setEditOpen] = useState(false);
   const [viewing, setViewing] = useState(null);
+  const [viewAppt, setViewAppt] = useState(null);
   const [pdfViewer, setPdfViewer] = useState(null);
 
   const load = () => api.get(`/therapy/patients/${id}`).then(({ data }) => setData(data)).catch(e => setError(e.response?.data?.message || 'Error al cargar'));
@@ -129,6 +138,59 @@ export default function PatientDetail() {
           </Table>
         </TableContainer>
       </Card>
+
+      <Typography variant="subtitle1" fontWeight={700} color="primary.main" mt={2} mb={1}>Historial de citas</Typography>
+      <Card sx={{ borderRadius: 3, boxShadow: 2 }}>
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow sx={{ bgcolor: '#F5F7FA' }}>
+                <TableCell><b>#</b></TableCell>
+                <TableCell><b>Fecha y hora</b></TableCell>
+                <TableCell><b>Categoría</b></TableCell>
+                <TableCell><b>Estado</b></TableCell>
+                <TableCell><b>Docs</b></TableCell>
+                <TableCell align="center"><b>Ver</b></TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {(data.appointments || []).map(a => (
+                <TableRow key={a.id} hover>
+                  <TableCell>{a.id}</TableCell>
+                  <TableCell sx={{ fontSize: 13, whiteSpace: 'nowrap' }}>{fmtDateTime(a.starts_at)} — {fmtDateTime(a.ends_at).slice(-5)}</TableCell>
+                  <TableCell sx={{ fontSize: 13 }}>{APPT_CAT[a.category] || '—'}</TableCell>
+                  <TableCell><Chip size="small" label={APPT_STATUS[a.status]?.label || a.status} color={APPT_STATUS[a.status]?.color || 'default'} /></TableCell>
+                  <TableCell>{a.documents_count > 0 ? a.documents_count : '—'}</TableCell>
+                  <TableCell align="center">
+                    <Tooltip title="Ver cita"><IconButton size="small" onClick={() => setViewAppt(a)}><Visibility fontSize="small" /></IconButton></Tooltip>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {(data.appointments || []).length === 0 && (
+                <TableRow><TableCell colSpan={6} align="center" sx={{ py: 4, color: 'text.secondary' }}>Este paciente aún no tiene citas</TableCell></TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Card>
+
+      <Dialog open={!!viewAppt} onClose={() => setViewAppt(null)} maxWidth="sm" fullWidth>
+        <DialogContent>
+          {viewAppt && (
+            <>
+              <Typography variant="h6" fontWeight={700} color="primary.main">Cita #{viewAppt.id}</Typography>
+              <Typography variant="body2"><b>Fecha y hora:</b> {fmtDateTime(viewAppt.starts_at)} — {fmtDateTime(viewAppt.ends_at).slice(-5)}</Typography>
+              <Typography variant="body2"><b>Categoría:</b> {APPT_CAT[viewAppt.category] || '—'}</Typography>
+              <Typography variant="body2"><b>Estado:</b> {APPT_STATUS[viewAppt.status]?.label || viewAppt.status}</Typography>
+              {viewAppt.situacion_actual && <Typography variant="body2" mt={1}><b>Situación actual:</b> {viewAppt.situacion_actual}</Typography>}
+              {viewAppt.desarrollo && <Typography variant="body2" mt={0.5}><b>Desarrollo:</b> {viewAppt.desarrollo}</Typography>}
+              {viewAppt.plan_trabajo && <Typography variant="body2" mt={0.5}><b>Plan de trabajo:</b> {viewAppt.plan_trabajo}</Typography>}
+              {viewAppt.observaciones && <Typography variant="body2" mt={0.5}><b>Observaciones:</b> {viewAppt.observaciones}</Typography>}
+            </>
+          )}
+        </DialogContent>
+        <DialogActions><Button onClick={() => setViewAppt(null)}>Cerrar</Button></DialogActions>
+      </Dialog>
 
       <PatientDialog open={editOpen} patient={data} onClose={() => setEditOpen(false)} onSaved={() => { setEditOpen(false); load(); }} />
 

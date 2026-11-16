@@ -314,6 +314,10 @@ router.get('/patients/:id/ficha.pdf', verifyToken, requireTherapist, (req, res) 
   const patient = ownPatient(req, res);
   if (!patient) return;
   const screenings = db.prepare(`SELECT * FROM screenings WHERE patient_id = ? ORDER BY screened_at, id`).all(patient.id).map(parseScreening);
+  const appointments = db.prepare(`
+    SELECT a.*, (SELECT COUNT(*) FROM appointment_documents d WHERE d.appointment_id = a.id) AS documents_count
+    FROM appointments a WHERE a.patient_id = ? ORDER BY a.starts_at, a.id
+  `).all(patient.id);
   const therapist = db.prepare(`SELECT full_name, signature_image FROM users WHERE id = ?`).get(req.user.id);
   audit(req.user.id, 'EXPORT_FICHA', 'patient', patient.id, null);
 
@@ -323,7 +327,7 @@ router.get('/patients/:id/ficha.pdf', verifyToken, requireTherapist, (req, res) 
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `${req.query.view === 'true' ? 'inline' : 'attachment'}; filename="ficha_${patient.code}.pdf"`);
   doc.pipe(res);
-  generatePatientFichaPDF(doc, { patient, therapist, screenings });
+  generatePatientFichaPDF(doc, { patient, therapist, screenings, appointments });
   doc.end();
 });
 
@@ -334,8 +338,12 @@ router.get('/patients/:id', verifyToken, requireTherapist, (req, res) => {
     SELECT s.*, u.full_name AS therapist_name FROM screenings s JOIN users u ON s.therapist_id = u.id
     WHERE s.patient_id = ? ORDER BY s.screened_at DESC, s.id DESC
   `).all(patient.id).map(parseScreening);
+  const appointments = db.prepare(`
+    SELECT a.*, (SELECT COUNT(*) FROM appointment_documents d WHERE d.appointment_id = a.id) AS documents_count
+    FROM appointments a WHERE a.patient_id = ? ORDER BY a.starts_at DESC, a.id DESC
+  `).all(patient.id);
   audit(req.user.id, 'VIEW_PATIENT', 'patient', patient.id, null);
-  res.json({ ...patient, age: ageFrom(patient.birth_date), screenings });
+  res.json({ ...patient, age: ageFrom(patient.birth_date), screenings, appointments });
 });
 
 async function runAnalysis(screeningId) {
