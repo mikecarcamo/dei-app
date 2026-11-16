@@ -270,4 +270,42 @@ function drawTherapistSignature(doc, y, therapist) {
   }
 }
 
-module.exports = { generateScreeningPDF, generatePatientFichaPDF, DISCLAIMER };
+// Agenda de citas del terapeuta para un período (mes, semana o día).
+function generateAgendaPDF(doc, { therapist, label, appointments, blocks = [] }) {
+  let y = drawHeader(doc, 'Agenda de Citas', therapist.full_name);
+  y = drawSection(doc, y, 'Terapeuta:', therapist.full_name);
+  y = drawSection(doc, y, 'Período:', label);
+  y = drawSection(doc, y, 'Generado:', fmtDateTime(new Date().toISOString().slice(0, 16).replace('T', ' ')));
+  y += 6;
+
+  y = heading(doc, y, 'CITAS');
+  if (!appointments.length) {
+    y = paragraph(doc, y, 'No hay citas en este período.', { color: COLORS.muted });
+  }
+  for (const a of appointments) {
+    const lines = [
+      `${fmtDateTime(a.starts_at)} – ${fmtDateTime(a.ends_at).slice(-5)} · ${a.patient_name} (${a.patient_code}) · ${APPT_CATEGORY[a.category] || a.category || '—'}`,
+      `Estado: ${APPT_STATUS[a.status] || a.status}${a.observaciones ? ` · Observaciones: ${a.observaciones}` : ''}`,
+    ].join('\n');
+    doc.fontSize(9).font('Helvetica');
+    const h = doc.heightOfString(lines, { width: doc.page.width - 110 }) + 14;
+    y = ensureSpace(doc, y, h + 10);
+    const barColor = a.status === 'celebrada' ? '#2E7D32' : a.status === 'agendada' ? COLORS.primary : a.status === 'anulada' ? '#757575' : '#EF6C00';
+    doc.rect(40, y, 4, h).fill(barColor);
+    doc.rect(44, y, doc.page.width - 84, h).fill('#F7F9FC');
+    doc.fillColor(COLORS.text).text(lines, 56, y + 7, { width: doc.page.width - 110 });
+    y += h + 8;
+  }
+
+  if (blocks.length) {
+    y += 4;
+    y = heading(doc, y, 'HORARIOS BLOQUEADOS');
+    for (const b of blocks) {
+      y = paragraph(doc, y, `• ${fmtDateTime(b.starts_at)} – ${fmtDateTime(b.ends_at)}${b.reason ? ` · ${b.reason}` : ''}`, { size: 9, indent: 10, gap: 3 });
+    }
+  }
+
+  drawTherapistSignature(doc, y, therapist);
+}
+
+module.exports = { generateScreeningPDF, generatePatientFichaPDF, generateAgendaPDF, DISCLAIMER };

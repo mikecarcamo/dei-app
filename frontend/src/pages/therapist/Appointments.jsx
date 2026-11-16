@@ -4,7 +4,8 @@ import {
   TextField, Alert, CircularProgress, FormControl, InputLabel, Select, MenuItem,
   Chip, Radio, RadioGroup, FormControlLabel, Divider, Tooltip, IconButton,
 } from '@mui/material';
-import { Add, Block, EventAvailable, Delete, AttachFile, InsertDriveFile } from '@mui/icons-material';
+import { Add, Block, EventAvailable, Delete, AttachFile, InsertDriveFile, PictureAsPdf } from '@mui/icons-material';
+import PdfViewerModal, { openOrDownloadPdf } from '../../components/PdfViewerModal';
 import { Calendar, dayjsLocalizer, Views } from 'react-big-calendar';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import dayjs from 'dayjs';
@@ -412,6 +413,28 @@ export default function Appointments() {
   const [blockOpen, setBlockOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const [closing, setClosing] = useState(null);
+  const [calView, setCalView] = useState(Views.MONTH);
+  const [calDate, setCalDate] = useState(dayjs());
+  const [pdfViewer, setPdfViewer] = useState(null);
+
+  const agendaRange = () => {
+    if (calView === Views.DAY) return { from: calDate, to: calDate, label: `Día ${calDate.format('DD/MM/YYYY')}` };
+    if (calView === Views.WEEK) {
+      const from = calDate.startOf('week'); const to = calDate.endOf('week');
+      return { from, to, label: `Semana del ${from.format('DD/MM/YYYY')} al ${to.format('DD/MM/YYYY')}` };
+    }
+    return { from: calDate.startOf('month'), to: calDate.endOf('month'), label: `Mes de ${calDate.format('MMMM YYYY')}` };
+  };
+
+  const openAgendaPdf = async () => {
+    const r = agendaRange();
+    const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+    const url = `${baseURL}/therapy/appointments/agenda.pdf?from=${r.from.format('YYYY-MM-DD')}&to=${r.to.format('YYYY-MM-DD')}&label=${encodeURIComponent(r.label)}&view=true`;
+    const token = localStorage.getItem('dei_token');
+    const filename = `agenda_${r.from.format('YYYY-MM-DD')}_${r.to.format('YYYY-MM-DD')}.pdf`;
+    const viewUrl = await openOrDownloadPdf({ url, filename, token });
+    if (viewUrl) setPdfViewer({ url, title: `Agenda — ${r.label}`, filename, token });
+  };
 
   const load = () => {
     setLoading(true);
@@ -464,6 +487,9 @@ export default function Appointments() {
           <Button variant="contained" startIcon={<Add />} onClick={() => { setSlot(null); setNewOpen(true); }} disabled={!license?.active}>
             Nueva cita
           </Button>
+          <Button variant="contained" color="secondary" startIcon={<PictureAsPdf />} onClick={openAgendaPdf}>
+            Agenda PDF
+          </Button>
         </Box>
       </Box>
 
@@ -477,7 +503,10 @@ export default function Appointments() {
           events={events}
           style={{ height: 650 }}
           views={[Views.MONTH, Views.WEEK, Views.DAY]}
-          defaultView={Views.MONTH}
+          view={calView}
+          date={calDate.toDate()}
+          onView={setCalView}
+          onNavigate={(d) => setCalDate(dayjs(d))}
           messages={CAL_MESSAGES}
           culture="es"
           selectable
@@ -512,6 +541,10 @@ export default function Appointments() {
         onDeleteBlock={async (b) => { await api.delete(`/therapy/blocks/${b.id}`); refresh(); }} />
       <CloseAppointmentDialog open={!!closing} appt={closing}
         onClose={() => setClosing(null)} onSaved={() => refresh()} />
+      {pdfViewer && (
+        <PdfViewerModal open={!!pdfViewer} url={pdfViewer.url} title={pdfViewer.title}
+          token={pdfViewer.token} filename={pdfViewer.filename} onClose={() => setPdfViewer(null)} />
+      )}
     </Box>
   );
 }

@@ -267,6 +267,7 @@ export default function Manual() {
                   <Typography variant="caption" display="block">Opcional en cualquier cierre: botón "Adjuntar" (máx. 5 archivos de 5 MB). Quedan guardados en la cita y se descargan desde su detalle.</Typography>
                 </Paper>
               ) },
+              { label: '"Agenda PDF"', body: 'Genera un PDF con su nombre, el rango que esté viendo en ese momento (el mes, la semana o el día seleccionado en el calendario) y el listado de citas ordenado por fecha — con paciente, horario, categoría, estado y observaciones; también incluye los horarios bloqueados del período y su firma al final.' },
               { label: 'Colores', body: 'Azul = Agendada · Verde = Celebrada · Naranja = Cancelada · Gris = Anulada · Gris rayado = horario bloqueado.' },
             ]} />
             <P mt={1}>Sin licencia vigente los botones "Nueva cita" y "Bloquear horario" se deshabilitan.</P>

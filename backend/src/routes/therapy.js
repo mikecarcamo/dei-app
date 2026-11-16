@@ -10,7 +10,7 @@ const { todayGT, timestampGT } = require('../utils/dates');
 const { scoreInstrument, evaluateRisk, filterHypotheses, publicInstruments, DEFAULT_CRISIS_RESOURCES } = require('../utils/screening');
 const { generateScreeningAnalysis } = require('../utils/ai');
 const { drawWatermark } = require('../utils/pdf');
-const { generateScreeningPDF, generatePatientFichaPDF } = require('../utils/pdf_screening');
+const { generateScreeningPDF, generatePatientFichaPDF, generateAgendaPDF } = require('../utils/pdf_screening');
 
 const requireTherapist = requireRole('TERAPEUTA');
 
@@ -520,6 +520,34 @@ router.get('/appointments', verifyToken, requireTherapist, (req, res) => {
     ORDER BY starts_at
   `).all(req.user.id, ...params);
   res.json({ appointments, blocks });
+});
+
+router.get('/appointments/agenda.pdf', verifyToken, requireTherapist, (req, res) => {
+  const from = (req.query.from || '').match(/^\d{4}-\d{2}-\d{2}$/)?.[0];
+  const to = (req.query.to || '').match(/^\d{4}-\d{2}-\d{2}$/)?.[0];
+  if (!from || !to) return res.status(400).json({ message: 'Indique el rango de fechas (from, to)' });
+  const appointments = db.prepare(`
+    SELECT a.*, p.full_name AS patient_name, p.code AS patient_code
+    FROM appointments a JOIN patients p ON p.id = a.patient_id
+    WHERE a.therapist_id = ? AND a.starts_at <= ? || ' 23:59' AND a.ends_at >= ?
+    ORDER BY a.starts_at
+  `).all(req.user.id, to, from);
+  const blocks = db.prepare(`
+    SELECT * FROM therapist_blocks
+    WHERE therapist_id = ? AND starts_at <= ? || ' 23:59' AND ends_at >= ?
+    ORDER BY starts_at
+  `).all(req.user.id, to, from);
+  const therapist = db.prepare(`SELECT full_name, signature_image FROM users WHERE id = ?`).get(req.user.id);
+  audit(req.user.id, 'EXPORT_AGENDA_PDF', 'user', req.user.id, { from, to });
+
+  const doc = new PDFDocument({ margin: 40, size: 'LETTER', bufferPages: true });
+  drawWatermark(doc);
+  doc.on('pageAdded', () => drawWatermark(doc));
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `${req.query.view === 'true' ? 'inline' : 'attachment'}; filename="agenda_${from}_${to}.pdf"`);
+  doc.pipe(res);
+  generateAgendaPDF(doc, { therapist, label: String(req.query.label || `${from} → ${to}`), appointments, blocks });
+  doc.end();
 });
 
 router.post('/appointments', verifyToken, requireTherapist, requireLicense, (req, res) => {
