@@ -217,7 +217,7 @@ function drawTherapistSignature(doc, y, therapist) {
       const img = Buffer.from(therapist.signature_image.split(',')[1], 'base64');
       // Primero el nombre (abajo a la izquierda), luego la firma montada encima.
       doc.fontSize(12).font('Helvetica-Bold').fillColor(COLORS.text)
-        .text(therapist.full_name, x + 10, y + 58, { width: w - 20, align: 'left' });
+        .text(therapist.full_name, x, y + 58, { width: w, align: 'center' });
       doc.image(img, x, y - 4, { fit: [w, 84], align: 'center' });
     } catch (e) {
       doc.fontSize(11).font('Helvetica-Bold').fillColor(COLORS.text)

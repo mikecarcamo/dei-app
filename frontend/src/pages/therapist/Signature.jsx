@@ -6,25 +6,52 @@ import { Upload, Save, Delete, AutoFixHigh } from '@mui/icons-material';
 import api from '../../api/axios';
 import { LicenseBanner, useTherapistLicense } from './common';
 
-// Quita el fondo blanco/claro de la imagen: píxeles con R,G,B >= threshold pasan a transparentes.
-function removeWhiteBackground(dataUrl, threshold = 235) {
+const TARGET_W = 280, TARGET_H = 84;
+
+// Quita el fondo claro, recorta bordes transparentes y redimensiona a 280x84 conservando proporción.
+function processSignature(dataUrl, threshold = 235) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
+      const work = document.createElement('canvas');
+      work.width = img.width;
+      work.height = img.height;
+      const ctx = work.getContext('2d');
       ctx.drawImage(img, 0, 0);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const imageData = ctx.getImageData(0, 0, work.width, work.height);
       const d = imageData.data;
       for (let i = 0; i < d.length; i += 4) {
         if (d[i] >= threshold && d[i + 1] >= threshold && d[i + 2] >= threshold) d[i + 3] = 0;
       }
       ctx.putImageData(imageData, 0, 0);
-      resolve(canvas.toDataURL('image/png'));
+
+      // Recortar al contenido visible
+      const px = ctx.getImageData(0, 0, work.width, work.height).data;
+      let minX = work.width, minY = work.height, maxX = 0, maxY = 0;
+      for (let yy = 0; yy < work.height; yy++) {
+        for (let xx = 0; xx < work.width; xx++) {
+          if (px[(yy * work.width + xx) * 4 + 3] > 10) {
+            if (xx < minX) minX = xx; if (xx > maxX) maxX = xx;
+            if (yy < minY) minY = yy; if (yy > maxY) maxY = yy;
+          }
+        }
+      }
+      if (maxX <= minX || maxY <= minY) return reject(new Error('La imagen quedó vacía al quitar el fondo'));
+      const cw = maxX - minX + 1, ch = maxY - minY + 1;
+      if (cw < TARGET_W || ch < TARGET_H) {
+        return reject(new Error(`La firma debe medir al menos ${TARGET_W}x${TARGET_H} px (detectado: ${cw}x${ch})`));
+      }
+
+      // Escalar a 280x84 conservando proporción (encajar)
+      const scale = Math.min(TARGET_W / cw, TARGET_H / ch);
+      const dw = Math.round(cw * scale), dh = Math.round(ch * scale);
+      const out = document.createElement('canvas');
+      out.width = TARGET_W; out.height = TARGET_H;
+      const octx = out.getContext('2d');
+      octx.drawImage(work, minX, minY, cw, ch, (TARGET_W - dw) / 2, (TARGET_H - dh) / 2, dw, dh);
+      resolve(out.toDataURL('image/png'));
     };
-    img.onerror = reject;
+    img.onerror = () => reject(new Error('No se pudo leer la imagen'));
     img.src = dataUrl;
   });
 }
@@ -43,11 +70,10 @@ export default function Signature() {
 
   useEffect(() => {
     if (!original) { setProcessed(null); return; }
-    if (removeBg) {
-      removeWhiteBackground(original, threshold).then(setProcessed).catch(() => setProcessed(original));
-    } else {
-      setProcessed(original);
-    }
+    setMsg('');
+    processSignature(original, removeBg ? threshold : 256)
+      .then(setProcessed)
+      .catch(e => { setProcessed(null); setMsg(e.message); });
   }, [original, threshold, removeBg]);
 
   const onPick = (e) => {
