@@ -13,6 +13,13 @@ function fmtDateTime(str) {
   return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
+// dd/mm/yyyy
+function fmtDate(str) {
+  if (!str) return '—';
+  const m = String(str).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : str;
+}
+
 function ensureSpace(doc, y, needed = 80) {
   if (y + needed > doc.page.height - 50) { doc.addPage(); return 50; }
   return y;
@@ -160,11 +167,11 @@ function generatePatientFichaPDF(doc, { patient, therapist, screenings }) {
   const rows = [
     ['Código de paciente:', patient.code],
     ['Nombre completo:', patient.full_name],
-    ['Fecha de nacimiento:', patient.birth_date || '—'],
+    ['Fecha de nacimiento:', patient.birth_date ? fmtDate(patient.birth_date) : '—'],
     ['Sexo:', SEX_LABEL[patient.sex] || '—'],
     ['Teléfono:', patient.phone || '—'],
     ['Correo:', patient.email || '—'],
-    ['Consentimiento informado:', patient.consent ? `Sí (${patient.consent_date || 'sin fecha'})` : 'No registrado'],
+    ['Consentimiento informado:', patient.consent ? `Sí (${fmtDate(patient.consent_date)})` : 'No registrado'],
     ['Terapeuta responsable:', therapist.full_name],
     ['Motivo de consulta:', patient.consultation_reason || '—'],
     ['Antecedentes relevantes:', patient.background || '—'],
