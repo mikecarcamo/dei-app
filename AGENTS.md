@@ -14,3 +14,4 @@
 - Base clínica: `backend/knowledge/clinical-mental-health/SKILL.md` (dentro de `backend/` porque Railway despliega desde esa carpeta).
 - Frontend: `frontend/src/pages/therapist/` (Tamizaje, Pacientes, Historial) y `frontend/src/pages/admin/Therapists.jsx`.
 - Sin licencia vigente el terapeuta puede consultar el historial, pero no crear ni editar pacientes ni tamizajes.
+- Citas (`/terapeuta/citas`): `appointments` (duración fija 1h) y `therapist_blocks` en `migrate_citas.js`; traslapes validados en `overlapConflicts` de `therapy.js` (solo bloquean estados agendada/celebrada; cancelada/anulada liberan el horario).

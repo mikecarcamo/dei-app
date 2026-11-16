@@ -27,6 +27,7 @@ require('./src/db/migrate_burnout');
 require('./src/db/migrate_response_answers');
 require('./src/db/migrate_clima');
 require('./src/db/migrate_terapeuta');
+require('./src/db/migrate_citas');
 
 const seeds = ['./src/db/seed', './src/db/seed_burnout', './src/db/seed_clima'];
 for (const s of seeds) {

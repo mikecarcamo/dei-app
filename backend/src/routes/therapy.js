@@ -455,6 +455,160 @@ router.get('/screenings/:id/pdf', verifyToken, requireTherapist, (req, res) => {
   doc.end();
 });
 
+// ------------------------------------------------------------------
+// CITAS
+// ------------------------------------------------------------------
+
+const CLOSE_STATUSES = ['celebrada', 'cancelada_paciente', 'cancelada_terapeuta', 'anulada'];
+const CLOSE_LABELS = { celebrada: 'Celebrada', cancelada_paciente: 'Cancelada por paciente', cancelada_terapeuta: 'Cancelada por terapeuta', anulada: 'Anulada' };
+
+function normalizeDT(v) {
+  if (!v || typeof v !== 'string') return null;
+  const m = v.trim().replace('T', ' ').match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})/);
+  return m ? `${m[1]} ${m[2]}` : null;
+}
+
+function plusHour(startsAt) {
+  const d = new Date(startsAt.replace(' ', 'T'));
+  if (isNaN(d)) return null;
+  d.setMinutes(d.getMinutes() + 60);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function overlapConflicts(therapistId, startsAt, endsAt, excludeId = null) {
+  const appt = db.prepare(`
+    SELECT a.id, a.starts_at, a.ends_at, p.full_name AS patient_name
+    FROM appointments a JOIN patients p ON p.id = a.patient_id
+    WHERE a.therapist_id = ? AND a.status IN ('agendada','celebrada')
+      AND a.id != COALESCE(?, -1) AND NOT (a.ends_at <= ? OR a.starts_at >= ?)
+    LIMIT 1
+  `).get(therapistId, excludeId, startsAt, endsAt);
+  if (appt) return { type: 'cita', ...appt };
+  const block = db.prepare(`
+    SELECT id, starts_at, ends_at, reason FROM therapist_blocks
+    WHERE therapist_id = ? AND NOT (ends_at <= ? OR starts_at >= ?)
+    LIMIT 1
+  `).get(therapistId, startsAt, endsAt);
+  if (block) return { type: 'bloqueo', ...block };
+  return null;
+}
+
+router.get('/appointments', verifyToken, requireTherapist, (req, res) => {
+  const from = (req.query.from || '').slice(0, 10);
+  const to = (req.query.to || '').slice(0, 10);
+  const range = from && to ? `AND a.starts_at < ? || ' 23:59' AND a.ends_at > ?` : '';
+  const params = from && to ? [to, from] : [];
+  const appointments = db.prepare(`
+    SELECT a.*, p.full_name AS patient_name, p.code AS patient_code
+    FROM appointments a JOIN patients p ON p.id = a.patient_id
+    WHERE a.therapist_id = ? ${range}
+    ORDER BY a.starts_at
+  `).all(req.user.id, ...params);
+  const blocks = db.prepare(`
+    SELECT * FROM therapist_blocks
+    WHERE therapist_id = ? ${from && to ? `AND starts_at < ? || ' 23:59' AND ends_at > ?` : ''}
+    ORDER BY starts_at
+  `).all(req.user.id, ...params);
+  res.json({ appointments, blocks });
+});
+
+router.post('/appointments', verifyToken, requireTherapist, requireLicense, (req, res) => {
+  const patient = ownPatient(req, res);
+  if (!patient) return;
+  const startsAt = normalizeDT(req.body.starts_at);
+  if (!startsAt) return res.status(400).json({ message: 'Indique fecha y hora de la cita' });
+  const endsAt = plusHour(startsAt);
+  const conflict = overlapConflicts(req.user.id, startsAt, endsAt);
+  if (conflict) return res.status(409).json({
+    message: conflict.type === 'cita'
+      ? `Se traslapa con la cita #${conflict.id} de ${conflict.patient_name} (${conflict.starts_at} - ${conflict.ends_at})`
+      : `Se traslapa con un horario bloqueado (${conflict.starts_at} - ${conflict.ends_at}${conflict.reason ? `: ${conflict.reason}` : ''})`,
+  });
+  const r = db.prepare(`
+    INSERT INTO appointments (therapist_id, patient_id, starts_at, ends_at, status, observaciones)
+    VALUES (?, ?, ?, ?, 'agendada', ?)
+  `).run(req.user.id, patient.id, startsAt, endsAt, req.body.observaciones || null);
+  audit(req.user.id, 'CREATE_APPOINTMENT', 'appointment', r.lastInsertRowid, { patient_id: patient.id, starts_at: startsAt });
+  res.status(201).json(db.prepare(`SELECT a.*, p.full_name AS patient_name, p.code AS patient_code FROM appointments a JOIN patients p ON p.id = a.patient_id WHERE a.id = ?`).get(r.lastInsertRowid));
+});
+
+function ownAppointment(req, res) {
+  const a = db.prepare(`SELECT * FROM appointments WHERE id = ?`).get(req.params.id);
+  if (!a) { res.status(404).json({ message: 'Cita no encontrada' }); return null; }
+  if (a.therapist_id !== req.user.id) { res.status(403).json({ message: 'Sin acceso a esta cita' }); return null; }
+  return a;
+}
+
+router.put('/appointments/:id/reschedule', verifyToken, requireTherapist, requireLicense, (req, res) => {
+  const a = ownAppointment(req, res);
+  if (!a) return;
+  if (a.status !== 'agendada') return res.status(400).json({ message: 'Solo se puede reprogramar una cita agendada' });
+  const startsAt = normalizeDT(req.body.starts_at);
+  if (!startsAt) return res.status(400).json({ message: 'Indique fecha y hora de la cita' });
+  const endsAt = plusHour(startsAt);
+  const conflict = overlapConflicts(req.user.id, startsAt, endsAt, a.id);
+  if (conflict) return res.status(409).json({
+    message: conflict.type === 'cita'
+      ? `Se traslapa con la cita #${conflict.id} de ${conflict.patient_name} (${conflict.starts_at} - ${conflict.ends_at})`
+      : `Se traslapa con un horario bloqueado (${conflict.starts_at} - ${conflict.ends_at}${conflict.reason ? `: ${conflict.reason}` : ''})`,
+  });
+  db.prepare(`UPDATE appointments SET starts_at = ?, ends_at = ?, updated_at = ? WHERE id = ?`)
+    .run(startsAt, endsAt, timestampGT(), a.id);
+  audit(req.user.id, 'RESCHEDULE_APPOINTMENT', 'appointment', a.id, { starts_at: startsAt });
+  res.json(db.prepare(`SELECT a.*, p.full_name AS patient_name, p.code AS patient_code FROM appointments a JOIN patients p ON p.id = a.patient_id WHERE a.id = ?`).get(a.id));
+});
+
+router.put('/appointments/:id/close', verifyToken, requireTherapist, requireLicense, (req, res) => {
+  const a = ownAppointment(req, res);
+  if (!a) return;
+  if (a.status !== 'agendada') return res.status(400).json({ message: `La cita ya está cerrada (${CLOSE_LABELS[a.status] || a.status})` });
+  const outcome = req.body.outcome;
+  if (!CLOSE_STATUSES.includes(outcome)) return res.status(400).json({ message: 'Estado de cierre inválido' });
+  const { situacion_actual, desarrollo, plan_trabajo, observaciones } = req.body;
+  if (outcome === 'celebrada') {
+    const missing = [['Situación actual', situacion_actual], ['Desarrollo', desarrollo], ['Plan de trabajo', plan_trabajo], ['Observaciones', observaciones]]
+      .filter(([, v]) => !v || !String(v).trim()).map(([k]) => k);
+    if (missing.length) return res.status(400).json({ message: `Para concluir como "Celebrada" complete: ${missing.join(', ')}` });
+  } else if (!observaciones || !String(observaciones).trim()) {
+    return res.status(400).json({ message: `Para "${CLOSE_LABELS[outcome]}" indique las Observaciones` });
+  }
+  db.prepare(`
+    UPDATE appointments SET status = ?, situacion_actual = ?, desarrollo = ?, plan_trabajo = ?, observaciones = ?, closed_at = ?, updated_at = ?
+    WHERE id = ?
+  `).run(outcome, situacion_actual || null, desarrollo || null, plan_trabajo || null, observaciones, timestampGT(), timestampGT(), a.id);
+  audit(req.user.id, 'CLOSE_APPOINTMENT', 'appointment', a.id, { outcome });
+  res.json(db.prepare(`SELECT a.*, p.full_name AS patient_name, p.code AS patient_code FROM appointments a JOIN patients p ON p.id = a.patient_id WHERE a.id = ?`).get(a.id));
+});
+
+router.post('/blocks', verifyToken, requireTherapist, requireLicense, (req, res) => {
+  const startsAt = normalizeDT(req.body.starts_at);
+  const endsAt = normalizeDT(req.body.ends_at);
+  if (!startsAt || !endsAt) return res.status(400).json({ message: 'Indique el rango de fechas y horas del bloqueo' });
+  if (endsAt <= startsAt) return res.status(400).json({ message: 'La fecha/hora final debe ser posterior al inicio' });
+  const conflict = db.prepare(`
+    SELECT a.id, a.starts_at, a.ends_at, p.full_name AS patient_name
+    FROM appointments a JOIN patients p ON p.id = a.patient_id
+    WHERE a.therapist_id = ? AND a.status IN ('agendada','celebrada')
+      AND NOT (a.ends_at <= ? OR a.starts_at >= ?)
+    LIMIT 1
+  `).get(req.user.id, startsAt, endsAt);
+  if (conflict) return res.status(409).json({ message: `Hay una cita agendada en ese rango: #${conflict.id} ${conflict.patient_name} (${conflict.starts_at} - ${conflict.ends_at}). Cancélela o reprográmela primero.` });
+  const r = db.prepare(`INSERT INTO therapist_blocks (therapist_id, starts_at, ends_at, reason) VALUES (?, ?, ?, ?)`)
+    .run(req.user.id, startsAt, endsAt, req.body.reason || null);
+  audit(req.user.id, 'CREATE_BLOCK', 'therapist_block', r.lastInsertRowid, { starts_at: startsAt, ends_at: endsAt });
+  res.status(201).json(db.prepare(`SELECT * FROM therapist_blocks WHERE id = ?`).get(r.lastInsertRowid));
+});
+
+router.delete('/blocks/:id', verifyToken, requireTherapist, (req, res) => {
+  const b = db.prepare(`SELECT * FROM therapist_blocks WHERE id = ?`).get(req.params.id);
+  if (!b) return res.status(404).json({ message: 'Bloqueo no encontrado' });
+  if (b.therapist_id !== req.user.id) return res.status(403).json({ message: 'Sin acceso a este bloqueo' });
+  db.prepare(`DELETE FROM therapist_blocks WHERE id = ?`).run(b.id);
+  audit(req.user.id, 'DELETE_BLOCK', 'therapist_block', b.id, null);
+  res.json({ ok: true });
+});
+
 module.exports = router;
 // Compartidos con el endpoint público /api/screening-link.
 module.exports.runScreeningAnalysis = runAnalysis;

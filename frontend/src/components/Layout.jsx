@@ -40,6 +40,7 @@ const userMenuItems = [
 const therapistMenuItems = [
   { label: 'Terapeuta', icon: <MedicalServices />, children: [
     { label: 'Pacientes', icon: <PersonSearch />, path: '/terapeuta/pacientes' },
+    { label: 'Citas', icon: <Event />, path: '/terapeuta/citas' },
     { label: 'Firma y Sello', icon: <Draw />, path: '/terapeuta/firma' },
   ] },
 ];

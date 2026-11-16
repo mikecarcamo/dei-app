@@ -29,6 +29,7 @@ Plataforma de evaluación psicológica: React+Vite+MUI (Netlify) + Express+SQLit
 - Link de un solo uso: el paciente responde sin login en `/tamizaje/:token`; no ve resultados; al enviar, el terapeuta recibe correo (Brevo, `BREVO_API_KEY` xkeysib vía API REST — Railway bloquea SMTP).
 - Hipótesis IA validadas contra `dsm_whitelist`; las fuera de lista se descartan.
 - PDFs de tamizaje y ficha llevan firma+sello que cada terapeuta sube en Terapeuta→Firma y Sello (quita-fondo + compresión a 280×84, montada sobre el nombre).
+- Citas (Terapeuta→Citas): calendario react-big-calendar (mes/semana/día, dayjsLocalizer). Tabla `appointments` (1h fija, status agendada/celebrada/cancelada_paciente/cancelada_terapeuta/anulada) y `therapist_blocks`. Sin traslapes por terapeuta (validación en `overlapConflicts`, therapy.js). Cierre "celebrada" exige 4 textareas (situación actual, desarrollo, plan de trabajo, observaciones); los otros cierres solo observaciones. Migración `migrate_citas.js`.
 - Landing del terapeuta: `/terapeuta/pacientes`.
 
 ## Reglas de trabajo
