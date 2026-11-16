@@ -181,19 +181,28 @@ function CloseAppointmentDialog({ open, appt, onClose, onSaved }) {
 }
 
 function BlockDialog({ open, onClose, onSaved }) {
-  const [form, setForm] = useState({ starts_at: '', ends_at: '', reason: '' });
+  const [type, setType] = useState('daily');
+  const [form, setForm] = useState({ starts_at: '', ends_at: '', date_from: '', date_to: '', time_from: '', time_to: '', reason: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [warning, setWarning] = useState(null);
 
-  useEffect(() => { if (open) { setForm({ starts_at: '', ends_at: '', reason: '' }); setError(''); } }, [open]);
+  useEffect(() => { if (open) { setType('daily'); setForm({ starts_at: '', ends_at: '', date_from: '', date_to: '', time_from: '', time_to: '', reason: '' }); setError(''); setWarning(null); } }, [open]);
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
 
   const handleSave = async () => {
-    if (!form.starts_at || !form.ends_at) { setError('Indique el rango de fechas y horas'); return; }
-    setLoading(true); setError('');
+    if (type === 'single' && (!form.starts_at || !form.ends_at)) { setError('Indique el rango de fechas y horas'); return; }
+    if (type !== 'single' && (!form.date_from || !form.date_to)) { setError('Indique el rango de fechas'); return; }
+    if (type === 'daily' && (!form.time_from || !form.time_to)) { setError('Indique el rango de horas'); return; }
+    setLoading(true); setError(''); setWarning(null);
     try {
-      await api.post('/therapy/blocks', form);
-      onSaved();
+      const { data } = await api.post('/therapy/blocks', { type, ...form });
+      if (data.conflicts?.length) {
+        setWarning(data.conflicts);
+        onSaved(false);
+      } else {
+        onSaved();
+      }
     } catch (e) {
       setError(e.response?.data?.message || 'Error al crear el bloqueo');
     } finally {
@@ -206,20 +215,58 @@ function BlockDialog({ open, onClose, onSaved }) {
       <DialogTitle>Bloquear horario</DialogTitle>
       <DialogContent>
         <Typography variant="body2" color="text.secondary" mb={1}>
-          Marque el rango de fechas y horas en que no atenderá. No se podrán agendar citas que se traslapen.
+          En el horario bloqueado no se podrán agendar citas que se traslapen.
         </Typography>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-        <Box display="flex" gap={2}>
-          <TextField label="Desde *" type="datetime-local" fullWidth margin="normal" InputLabelProps={{ shrink: true }} value={form.starts_at} onChange={set('starts_at')} />
-          <TextField label="Hasta *" type="datetime-local" fullWidth margin="normal" InputLabelProps={{ shrink: true }} value={form.ends_at} onChange={set('ends_at')} />
-        </Box>
-        <TextField label="Motivo (opcional)" fullWidth margin="normal" value={form.reason} onChange={set('reason')} placeholder="Ej: Vacaciones, congreso, permiso" />
+        {warning && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Bloqueo creado, pero <b>{warning.length} cita(s)</b> quedan agendadas dentro del rango bloqueado:
+            {warning.map(c => (
+              <Typography key={c.id} variant="caption" display="block">• #{c.id} {c.patient_name} — {c.starts_at}</Typography>
+            ))}
+            Cancele o reprograme esas citas.
+          </Alert>
+        )}
+        <FormControl fullWidth margin="normal">
+          <InputLabel>Tipo de bloqueo *</InputLabel>
+          <Select value={type} label="Tipo de bloqueo *" onChange={e => setType(e.target.value)}>
+            <MenuItem value="daily">Horario recurrente (rango de fechas + rango de horas)</MenuItem>
+            <MenuItem value="vacation">Vacaciones (días completos)</MenuItem>
+            <MenuItem value="single">Rango exacto (una sola vez)</MenuItem>
+          </Select>
+        </FormControl>
+        {type === 'single' ? (
+          <Box display="flex" gap={2}>
+            <TextField label="Desde *" type="datetime-local" fullWidth margin="normal" InputLabelProps={{ shrink: true }} value={form.starts_at} onChange={set('starts_at')} />
+            <TextField label="Hasta *" type="datetime-local" fullWidth margin="normal" InputLabelProps={{ shrink: true }} value={form.ends_at} onChange={set('ends_at')} />
+          </Box>
+        ) : (
+          <>
+            <Box display="flex" gap={2}>
+              <TextField label="Desde fecha *" type="date" fullWidth margin="normal" InputLabelProps={{ shrink: true }} value={form.date_from} onChange={set('date_from')} />
+              <TextField label="Hasta fecha *" type="date" fullWidth margin="normal" InputLabelProps={{ shrink: true }} value={form.date_to} onChange={set('date_to')} />
+            </Box>
+            {type === 'daily' && (
+              <Box display="flex" gap={2}>
+                <TextField label="Desde hora *" type="time" fullWidth margin="normal" InputLabelProps={{ shrink: true }} value={form.time_from} onChange={set('time_from')} />
+                <TextField label="Hasta hora *" type="time" fullWidth margin="normal" InputLabelProps={{ shrink: true }} value={form.time_to} onChange={set('time_to')} helperText="Se repite ese horario cada día del rango" />
+              </Box>
+            )}
+            {type === 'vacation' && (
+              <Alert severity="info" sx={{ mt: 1 }}>Se bloquean todos los días del rango, de 00:00 a 23:59.</Alert>
+            )}
+          </>
+        )}
+        <TextField label="Motivo (opcional)" fullWidth margin="normal" value={form.reason} onChange={set('reason')}
+          placeholder={type === 'vacation' ? 'Ej: Vacaciones' : 'Ej: Congreso, permiso, almuerzo'} />
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancelar</Button>
-        <Button variant="contained" color="error" onClick={handleSave} disabled={loading}>
-          {loading ? <CircularProgress size={20} /> : 'Bloquear'}
-        </Button>
+        <Button onClick={onClose}>{warning ? 'Cerrar' : 'Cancelar'}</Button>
+        {!warning && (
+          <Button variant="contained" color="error" onClick={handleSave} disabled={loading}>
+            {loading ? <CircularProgress size={20} /> : 'Bloquear'}
+          </Button>
+        )}
       </DialogActions>
     </Dialog>
   );
@@ -407,7 +454,8 @@ export default function Appointments() {
 
       <NewAppointmentDialog open={newOpen} patients={patients} initialSlot={slot}
         onClose={() => setNewOpen(false)} onSaved={(closeIt, newPatient) => { if (newPatient) setPatients(ps => [...ps, newPatient]); if (closeIt !== false) refresh(); else load(); }} />
-      <BlockDialog open={blockOpen} onClose={() => setBlockOpen(false)} onSaved={() => refresh()} />
+      <BlockDialog open={blockOpen} onClose={() => setBlockOpen(false)}
+        onSaved={(closeIt) => { if (closeIt === false) load(); else refresh(); }} />
       <DetailDialog open={!!selected} item={selected}
         onClose={() => setSelected(null)}
         onClose_appt={(a) => { setSelected(null); setClosing(a); }}

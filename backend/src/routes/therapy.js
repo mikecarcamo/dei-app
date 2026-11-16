@@ -585,22 +585,57 @@ router.put('/appointments/:id/close', verifyToken, requireTherapist, requireLice
 });
 
 router.post('/blocks', verifyToken, requireTherapist, requireLicense, (req, res) => {
-  const startsAt = normalizeDT(req.body.starts_at);
-  const endsAt = normalizeDT(req.body.ends_at);
-  if (!startsAt || !endsAt) return res.status(400).json({ message: 'Indique el rango de fechas y horas del bloqueo' });
-  if (endsAt <= startsAt) return res.status(400).json({ message: 'La fecha/hora final debe ser posterior al inicio' });
-  const conflict = db.prepare(`
+  const type = req.body.type || 'single';
+  const reason = req.body.reason || null;
+  const segments = [];
+
+  if (type === 'daily' || type === 'vacation') {
+    const dateFrom = (req.body.date_from || '').match(/^\d{4}-\d{2}-\d{2}$/)?.[0];
+    const dateTo = (req.body.date_to || '').match(/^\d{4}-\d{2}-\d{2}$/)?.[0];
+    if (!dateFrom || !dateTo) return res.status(400).json({ message: 'Indique el rango de fechas del bloqueo' });
+    if (dateTo < dateFrom) return res.status(400).json({ message: 'La fecha final debe ser igual o posterior a la inicial' });
+
+    if (type === 'vacation') {
+      segments.push({ starts_at: `${dateFrom} 00:00`, ends_at: `${dateTo} 23:59` });
+    } else {
+      const timeFrom = (req.body.time_from || '').match(/^\d{2}:\d{2}$/)?.[0];
+      const timeTo = (req.body.time_to || '').match(/^\d{2}:\d{2}$/)?.[0];
+      if (!timeFrom || !timeTo) return res.status(400).json({ message: 'Indique el rango de horas del bloqueo' });
+      if (timeTo <= timeFrom) return res.status(400).json({ message: 'La hora final debe ser posterior a la inicial' });
+      const days = [];
+      let d = new Date(`${dateFrom}T00:00:00`);
+      const end = new Date(`${dateTo}T00:00:00`);
+      while (d <= end && days.length < 93) { days.push(d.toISOString().slice(0, 10)); d.setDate(d.getDate() + 1); }
+      if (!days.length || d <= end) return res.status(400).json({ message: 'El rango de fechas es demasiado amplio (máx. 92 días)' });
+      for (const day of days) segments.push({ starts_at: `${day} ${timeFrom}`, ends_at: `${day} ${timeTo}` });
+    }
+  } else {
+    const startsAt = normalizeDT(req.body.starts_at);
+    const endsAt = normalizeDT(req.body.ends_at);
+    if (!startsAt || !endsAt) return res.status(400).json({ message: 'Indique el rango de fechas y horas del bloqueo' });
+    if (endsAt <= startsAt) return res.status(400).json({ message: 'La fecha/hora final debe ser posterior al inicio' });
+    segments.push({ starts_at: startsAt, ends_at: endsAt });
+  }
+
+  // Las citas agendadas/celebradas que se traslapan se devuelven como aviso (el bloqueo se crea igual).
+  const findAppts = db.prepare(`
     SELECT a.id, a.starts_at, a.ends_at, p.full_name AS patient_name
     FROM appointments a JOIN patients p ON p.id = a.patient_id
     WHERE a.therapist_id = ? AND a.status IN ('agendada','celebrada')
       AND NOT (a.ends_at <= ? OR a.starts_at >= ?)
-    LIMIT 1
-  `).get(req.user.id, startsAt, endsAt);
-  if (conflict) return res.status(409).json({ message: `Hay una cita agendada en ese rango: #${conflict.id} ${conflict.patient_name} (${conflict.starts_at} - ${conflict.ends_at}). Cancélela o reprográmela primero.` });
-  const r = db.prepare(`INSERT INTO therapist_blocks (therapist_id, starts_at, ends_at, reason) VALUES (?, ?, ?, ?)`)
-    .run(req.user.id, startsAt, endsAt, req.body.reason || null);
-  audit(req.user.id, 'CREATE_BLOCK', 'therapist_block', r.lastInsertRowid, { starts_at: startsAt, ends_at: endsAt });
-  res.status(201).json(db.prepare(`SELECT * FROM therapist_blocks WHERE id = ?`).get(r.lastInsertRowid));
+  `);
+  const conflicts = [];
+  const seen = new Set();
+  for (const s of segments) {
+    for (const c of findAppts.all(req.user.id, s.starts_at, s.ends_at)) {
+      if (!seen.has(c.id)) { seen.add(c.id); conflicts.push(c); }
+    }
+  }
+
+  const insert = db.prepare(`INSERT INTO therapist_blocks (therapist_id, starts_at, ends_at, reason) VALUES (?, ?, ?, ?)`);
+  const created = db.transaction(() => segments.map(s => insert.run(req.user.id, s.starts_at, s.ends_at, reason).lastInsertRowid))();
+  audit(req.user.id, 'CREATE_BLOCK', 'therapist_block', created[0], { count: created.length, type });
+  res.status(201).json({ created: created.length, conflicts });
 });
 
 router.delete('/blocks/:id', verifyToken, requireTherapist, (req, res) => {
