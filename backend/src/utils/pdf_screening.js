@@ -213,16 +213,19 @@ function drawTherapistSignature(doc, y, therapist) {
   const w = 280;
   const x = (doc.page.width - w) / 2;
   let nameY = y + 40;
+  let nameX = x;
   if (therapist.signature_image) {
     try {
       doc.image(Buffer.from(therapist.signature_image.split(',')[1], 'base64'), x, y - 4, { fit: [w, 84], align: 'center' });
-      nameY = y + 82;
+      // El nombre se sobrepone a la parte baja de la firma (transparencia).
+      nameY = y + 62;
+      nameX = x + 10;
     } catch (e) { /* imagen inválida: solo nombre */ }
   } else {
     doc.moveTo(x + 30, nameY).lineTo(x + w - 30, nameY).strokeColor(COLORS.secondary).stroke();
     nameY += 6;
   }
-  doc.fontSize(11).font('Helvetica-Bold').fillColor(COLORS.text).text(therapist.full_name, x, nameY, { width: w, align: 'center' });
+  doc.fontSize(12).font('Helvetica-Bold').fillColor(COLORS.text).text(therapist.full_name, nameX, nameY, { width: w - 20, align: 'left' });
 }
 
 module.exports = { generateScreeningPDF, generatePatientFichaPDF, DISCLAIMER };
