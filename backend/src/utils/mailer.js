@@ -1,34 +1,35 @@
-// Envío de correos transaccionales vía API de Brevo.
-// Variables de entorno: BREVO_API_KEY, BREVO_SENDER_EMAIL, BREVO_SENDER_NAME (opcional).
-const BREVO_URL = 'https://api.brevo.com/v3/smtp/email';
+// Envío de correos transaccionales vía SMTP de Brevo.
+// Variables de entorno:
+//   BREVO_API_KEY     → clave SMTP (xsmtpsib-...)
+//   BREVO_SMTP_LOGIN  → login SMTP (cXXXXXXX@smtp-brevo.com)
+//   BREVO_SENDER_EMAIL→ remitente verificado en Brevo
+//   BREVO_SENDER_NAME → nombre del remitente (opcional)
+const nodemailer = require('nodemailer');
+
+function transport() {
+  const { BREVO_API_KEY, BREVO_SMTP_LOGIN } = process.env;
+  if (!BREVO_API_KEY || !BREVO_SMTP_LOGIN) return null;
+  return nodemailer.createTransport({
+    host: 'smtp-relay.brevo.com',
+    port: 587,
+    secure: false,
+    auth: { user: BREVO_SMTP_LOGIN, pass: BREVO_API_KEY },
+    connectionTimeout: 15000,
+  });
+}
 
 async function sendEmail({ to, subject, text }) {
-  const apiKey = process.env.BREVO_API_KEY;
-  if (!apiKey || !process.env.BREVO_SENDER_EMAIL) return false;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
+  const t = transport();
+  if (!t || !process.env.BREVO_SENDER_EMAIL) return false;
   try {
-    const res = await fetch(BREVO_URL, {
-      method: 'POST',
-      signal: controller.signal,
-      headers: { 'api-key': apiKey, 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({
-        sender: { email: process.env.BREVO_SENDER_EMAIL, name: process.env.BREVO_SENDER_NAME || 'Sistema DEI' },
-        to: [{ email: to }],
-        subject,
-        textContent: text,
-      }),
+    await t.sendMail({
+      from: `"${process.env.BREVO_SENDER_NAME || 'Sistema DEI'}" <${process.env.BREVO_SENDER_EMAIL}>`,
+      to, subject, text,
     });
-    if (!res.ok) {
-      console.error('Brevo API error:', res.status, (await res.text()).substring(0, 300));
-      return false;
-    }
     return true;
   } catch (e) {
     console.error('Error enviando correo:', e.message);
     return false;
-  } finally {
-    clearTimeout(timer);
   }
 }
 
