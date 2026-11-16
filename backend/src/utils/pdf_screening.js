@@ -1,5 +1,6 @@
 const { COLORS, drawHeader, drawSection, drawBox } = require('./pdf');
 const { INSTRUMENTS } = require('./screening');
+const { timestampGT } = require('./dates');
 
 const DISCLAIMER = 'Este tamizaje es una herramienta de apoyo y NO constituye un diagnóstico. Requiere evaluación y criterio de un profesional de salud mental.';
 const SUPPORT_LABEL = { alto: 'Alto', medio: 'Medio', bajo: 'Bajo' };
@@ -275,7 +276,7 @@ function generateAgendaPDF(doc, { therapist, label, appointments }) {
   let y = drawHeader(doc, 'Agenda de Citas', therapist.full_name);
   y = drawSection(doc, y, 'Terapeuta:', therapist.full_name);
   y = drawSection(doc, y, 'Período:', label);
-  y = drawSection(doc, y, 'Generado:', fmtDateTime(new Date().toISOString().slice(0, 16).replace('T', ' ')));
+  y = drawSection(doc, y, 'Generado:', fmtDateTime(timestampGT()));
 
   // Tabla horizontal de resumen por estado (colores del calendario) + total.
   const statusCols = [
