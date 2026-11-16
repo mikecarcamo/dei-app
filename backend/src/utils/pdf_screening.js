@@ -271,12 +271,35 @@ function drawTherapistSignature(doc, y, therapist) {
 }
 
 // Agenda de citas del terapeuta para un período (mes, semana o día).
-function generateAgendaPDF(doc, { therapist, label, appointments, blocks = [] }) {
+function generateAgendaPDF(doc, { therapist, label, appointments }) {
   let y = drawHeader(doc, 'Agenda de Citas', therapist.full_name);
   y = drawSection(doc, y, 'Terapeuta:', therapist.full_name);
   y = drawSection(doc, y, 'Período:', label);
   y = drawSection(doc, y, 'Generado:', fmtDateTime(new Date().toISOString().slice(0, 16).replace('T', ' ')));
-  y += 6;
+
+  // Tabla horizontal de resumen por estado (colores del calendario) + total.
+  const statusCols = [
+    { key: 'agendada', label: 'Agendada', color: COLORS.primary },
+    { key: 'celebrada', label: 'Celebrada', color: '#2E7D32' },
+    { key: 'cancelada_paciente', label: 'Canc. paciente', color: '#EF6C00' },
+    { key: 'cancelada_terapeuta', label: 'Canc. terapeuta', color: '#EF6C00' },
+    { key: 'anulada', label: 'Anulada', color: '#757575' },
+    { key: 'total', label: 'Total', color: '#37474F' },
+  ];
+  const counts = { total: appointments.length };
+  for (const a of appointments) counts[a.status] = (counts[a.status] || 0) + 1;
+  const tableW = doc.page.width - 80;
+  const colW = tableW / statusCols.length;
+  y = ensureSpace(doc, y + 4, 50);
+  statusCols.forEach((c, i) => {
+    const x = 40 + i * colW;
+    doc.rect(x, y, colW, 34).fill(c.color);
+    doc.fontSize(7.5).font('Helvetica-Bold').fillColor('white')
+      .text(c.label.toUpperCase(), x + 2, y + 6, { width: colW - 4, align: 'center' });
+    doc.fontSize(13).font('Helvetica-Bold').fillColor('white')
+      .text(String(counts[c.key] || 0), x + 2, y + 17, { width: colW - 4, align: 'center' });
+  });
+  y += 42;
 
   y = heading(doc, y, 'CITAS');
   if (!appointments.length) {
@@ -295,14 +318,6 @@ function generateAgendaPDF(doc, { therapist, label, appointments, blocks = [] })
     doc.rect(44, y, doc.page.width - 84, h).fill('#F7F9FC');
     doc.fillColor(COLORS.text).text(lines, 56, y + 7, { width: doc.page.width - 110 });
     y += h + 8;
-  }
-
-  if (blocks.length) {
-    y += 4;
-    y = heading(doc, y, 'HORARIOS BLOQUEADOS');
-    for (const b of blocks) {
-      y = paragraph(doc, y, `• ${fmtDateTime(b.starts_at)} – ${fmtDateTime(b.ends_at)}${b.reason ? ` · ${b.reason}` : ''}`, { size: 9, indent: 10, gap: 3 });
-    }
   }
 
   drawTherapistSignature(doc, y, therapist);

@@ -546,7 +546,7 @@ router.get('/appointments/agenda.pdf', verifyToken, requireTherapist, (req, res)
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `${req.query.view === 'true' ? 'inline' : 'attachment'}; filename="agenda_${from}_${to}.pdf"`);
   doc.pipe(res);
-  generateAgendaPDF(doc, { therapist, label: String(req.query.label || `${from} → ${to}`), appointments, blocks });
+  generateAgendaPDF(doc, { therapist, label: String(req.query.label || `${from} → ${to}`), appointments });
   doc.end();
 });
 
