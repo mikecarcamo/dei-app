@@ -6,6 +6,7 @@ const db = require('../db/database');
 const { scoreInstrument, evaluateRisk, publicInstruments } = require('../utils/screening');
 const { timestampGT, todayGT } = require('../utils/dates');
 const { runScreeningAnalysis, audit, getActiveLicense } = require('./therapy');
+const { sendScreeningCompletedEmail } = require('../utils/mailer');
 
 function getLink(token) {
   return db.prepare(`
@@ -58,6 +59,20 @@ router.post('/:token', async (req, res) => {
     return ins.lastInsertRowid;
   })();
   audit(link.therapist_id, 'SCREENING_VIA_LINK', 'screening', screeningId, { patient_id: link.patient_id });
+
+  // Aviso por correo al terapeuta (no bloquea la respuesta al paciente).
+  const therapist = db.prepare(`SELECT email, full_name FROM users WHERE id = ?`).get(link.therapist_id);
+  if (therapist?.email) {
+    sendScreeningCompletedEmail({
+      to: therapist.email,
+      therapistName: therapist.full_name,
+      patientCode: link.patient_code,
+      patientName: link.patient_name,
+      screenedAt: timestampGT(),
+      riskLevel: risk.level,
+      screeningId,
+    }).catch(() => {});
+  }
 
   await runScreeningAnalysis(screeningId);
   // Al paciente solo se le confirma el envío; nunca los resultados.
