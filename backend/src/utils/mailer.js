@@ -71,4 +71,42 @@ function sendScreeningCompletedEmail({ to, therapistName, patientCode, patientNa
   });
 }
 
-module.exports = { sendEmail, sendScreeningCompletedEmail };
+const APPT_CATEGORY_LABELS = {
+  PRESENCIAL_MENTAL_Z9: 'Presencial — MENTAL Zona 9',
+  PRESENCIAL_DEI_Z1: 'Presencial — DEI Zona 1',
+  VIRTUAL: 'Virtual',
+  LLAMADA: 'Llamada telefónica',
+};
+
+// Notificación de cita agendada o cancelada al terapeuta y al paciente (si tiene correo).
+// event: 'agendada' | 'cancelada'. statusLabel solo aplica en cancelación.
+function sendAppointmentEmail({ event, therapist, patient, appointment, statusLabel }) {
+  const cat = APPT_CATEGORY_LABELS[appointment.category] || appointment.category || '—';
+  const cuando = `${appointment.starts_at} a ${String(appointment.ends_at || '').slice(11, 16)} (hora de Guatemala)`;
+  const esCancel = event === 'cancelada';
+  const asunto = esCancel
+    ? `Cita ${statusLabel ? statusLabel.toLowerCase() : 'cancelada'} — ${patient.full_name}`
+    : `Cita agendada — ${patient.full_name}`;
+  const cuerpoPaciente = esCancel
+    ? `Le informamos que su cita del ${cuando} con ${therapist.full_name} fue ${statusLabel ? statusLabel.toLowerCase() : 'cancelada'}.`
+    : `Se agendó su cita del ${cuando} con ${therapist.full_name}.\nModalidad: ${cat}.`;
+  const cuerpoTerapeuta = esCancel
+    ? `La cita del ${cuando} con ${patient.full_name} (${patient.code}) fue marcada como "${statusLabel || 'Cancelada'}".\nObservaciones: ${appointment.observaciones || '—'}`
+    : `Agendó una cita para el ${cuando} con ${patient.full_name} (${patient.code}).\nModalidad: ${cat}.`;
+
+  const jobs = [sendEmail({
+    to: therapist.email,
+    subject: `[DEI] ${asunto}`,
+    text: [`Estimado/a ${therapist.full_name}:`, '', cuerpoTerapeuta, '', '— Sistema de Evaluación DEI'].join('\n'),
+  })];
+  if (patient.email) {
+    jobs.push(sendEmail({
+      to: patient.email,
+      subject: `[DEI] ${asunto}`,
+      text: [`Estimado/a ${patient.full_name}:`, '', cuerpoPaciente, '', 'Si necesita reprogramar o tiene dudas, comuníquese con su terapeuta.', '', '— Sistema de Evaluación DEI'].join('\n'),
+    }));
+  }
+  return Promise.allSettled(jobs);
+}
+
+module.exports = { sendEmail, sendScreeningCompletedEmail, sendAppointmentEmail };

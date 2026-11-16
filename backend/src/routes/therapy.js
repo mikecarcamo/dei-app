@@ -11,6 +11,7 @@ const { scoreInstrument, evaluateRisk, filterHypotheses, publicInstruments, DEFA
 const { generateScreeningAnalysis } = require('../utils/ai');
 const { drawWatermark } = require('../utils/pdf');
 const { generateScreeningPDF, generatePatientFichaPDF, generateAgendaPDF } = require('../utils/pdf_screening');
+const { sendAppointmentEmail } = require('../utils/mailer');
 
 const requireTherapist = requireRole('TERAPEUTA');
 
@@ -569,6 +570,7 @@ router.post('/appointments', verifyToken, requireTherapist, requireLicense, (req
     VALUES (?, ?, ?, ?, 'agendada', ?, ?)
   `).run(req.user.id, patient.id, startsAt, endsAt, req.body.observaciones || null, category);
   audit(req.user.id, 'CREATE_APPOINTMENT', 'appointment', r.lastInsertRowid, { patient_id: patient.id, starts_at: startsAt });
+  sendAppointmentEmail({ event: 'agendada', therapist: req.user, patient, appointment: { starts_at: startsAt, ends_at: endsAt, category } });
   res.status(201).json(db.prepare(`SELECT a.*, p.full_name AS patient_name, p.code AS patient_code FROM appointments a JOIN patients p ON p.id = a.patient_id WHERE a.id = ?`).get(r.lastInsertRowid));
 });
 
@@ -629,6 +631,10 @@ router.put('/appointments/:id/close', verifyToken, requireTherapist, requireLice
     for (const d of docs) ins.run(a.id, String(d.filename).slice(0, 200), d.mime || null, d.data);
   })();
   audit(req.user.id, 'CLOSE_APPOINTMENT', 'appointment', a.id, { outcome, documents: docs.length });
+  if (outcome !== 'celebrada') {
+    const patient = db.prepare(`SELECT * FROM patients WHERE id = ?`).get(a.patient_id);
+    if (patient) sendAppointmentEmail({ event: 'cancelada', therapist: req.user, patient, appointment: { ...a, observaciones }, statusLabel: CLOSE_LABELS[outcome] });
+  }
   res.json(db.prepare(`SELECT a.*, p.full_name AS patient_name, p.code AS patient_code FROM appointments a JOIN patients p ON p.id = a.patient_id WHERE a.id = ?`).get(a.id));
 });
 
