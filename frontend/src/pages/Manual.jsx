@@ -264,7 +264,7 @@ export default function Manual() {
                   <Typography variant="caption" display="block" fontWeight={700} mt={0.5}>Cancelada por paciente · Cancelada por terapeuta · Anulada</Typography>
                   <Typography variant="caption" display="block">Solo se piden las Observaciones (motivo).</Typography>
                   <Typography variant="caption" display="block" fontWeight={700} mt={0.5}>Documentos adjuntos</Typography>
-                  <Typography variant="caption" display="block">Opcional en cualquier cierre: botón "Adjuntar" (máx. 5 archivos de 5 MB). Quedan guardados en la cita y se descargan desde su detalle.</Typography>
+                  <Typography variant="caption" display="block">Opcional en cualquier cierre: botón "Adjuntar" (máx. 5 archivos de 5 MB). Quedan guardados en la cita; desde su detalle los PDF se abren en el visor y los demás formatos se descargan.</Typography>
                 </Paper>
               ) },
               { label: '"Agenda PDF"', body: 'Genera un PDF con su nombre, el rango que esté viendo en ese momento (el mes, la semana o el día seleccionado en el calendario), una tabla resumen con la cantidad de citas por estado (con sus colores) y el total, el listado de citas ordenado por fecha — paciente, horario, categoría, estado y observaciones — y su firma al final.' },

@@ -304,11 +304,25 @@ function BlockDialog({ open, onClose, onSaved }) {
   );
 }
 
+const isPdfDoc = (d) => d.mime === 'application/pdf' || /\.pdf$/i.test(d.filename || '');
+
 function DetailDialog({ open, item, onClose, onClose_appt, onReschedule, onDeleteBlock }) {
   const [moveTo, setMoveTo] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [docs, setDocs] = useState([]);
+  const [docViewer, setDocViewer] = useState(null);
+
+  const openDoc = async (d) => {
+    if (!isPdfDoc(d)) {
+      const a = document.createElement('a');
+      a.href = d.data_url; a.download = d.filename; a.click();
+      return;
+    }
+    // En web se abre en el visor; en móvil se descarga (comportamiento de openOrDownloadPdf).
+    const viewUrl = await openOrDownloadPdf({ url: d.data_url, filename: d.filename });
+    if (viewUrl) setDocViewer({ url: viewUrl, title: d.filename, filename: d.filename });
+  };
 
   useEffect(() => {
     setMoveTo(''); setError(''); setDocs([]);
@@ -369,8 +383,8 @@ function DetailDialog({ open, item, onClose, onClose_appt, onReschedule, onDelet
             <Typography variant="subtitle2" fontWeight={700} mb={0.5}>Documentos adjuntos</Typography>
             <Box display="flex" gap={1} flexWrap="wrap">
               {docs.map(d => (
-                <Chip key={d.id} icon={<InsertDriveFile fontSize="small" />} label={d.filename} size="small" component="a"
-                  href={d.data_url} download={d.filename} clickable target="_blank" />
+                <Chip key={d.id} icon={<InsertDriveFile fontSize="small" />} label={d.filename} size="small" clickable
+                  onClick={() => openDoc(d)} />
               ))}
             </Box>
           </>
@@ -396,6 +410,10 @@ function DetailDialog({ open, item, onClose, onClose_appt, onReschedule, onDelet
           </Button>
         )}
       </DialogActions>
+      {docViewer && (
+        <PdfViewerModal open={!!docViewer} url={docViewer.url} title={docViewer.title}
+          filename={docViewer.filename} onClose={() => setDocViewer(null)} />
+      )}
     </Dialog>
   );
 }

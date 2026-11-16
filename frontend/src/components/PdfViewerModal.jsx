@@ -9,7 +9,7 @@ export function isMobile() {
 
 export async function openOrDownloadPdf({ url, filename, token }) {
   if (isMobile()) {
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch(url, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined);
     const blob = await res.blob();
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -18,6 +18,12 @@ export async function openOrDownloadPdf({ url, filename, token }) {
     URL.revokeObjectURL(link.href);
     return null;
   }
+  // Adjuntos locales (data:/blob:): se convierten a ObjectURL para el iframe.
+  if (url.startsWith('data:') || url.startsWith('blob:')) {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    return URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+  }
   return url + (url.includes('?') ? '&' : '?') + 'view=true';
 }
 
@@ -25,7 +31,7 @@ export default function PdfViewerModal({ open, url, title, token, filename, onCl
   if (!open || !url) return null;
 
   const handleDownload = async () => {
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch(url, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined);
     const blob = await res.blob();
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -35,7 +41,9 @@ export default function PdfViewerModal({ open, url, title, token, filename, onCl
   };
 
   const sep = url.includes('?') ? '&' : '?';
-  const viewUrl = `${url}${sep}view=true&token=${encodeURIComponent(token)}`;
+  const viewUrl = url.startsWith('blob:') || url.startsWith('data:')
+    ? url
+    : `${url}${sep}view=true&token=${encodeURIComponent(token)}`;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth={false} fullWidth
