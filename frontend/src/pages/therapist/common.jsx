@@ -3,6 +3,7 @@ import {
   Box, Typography, Button, Card, CardContent, Chip, Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, Alert, AlertTitle, CircularProgress, FormControl, InputLabel, Select, MenuItem,
   FormControlLabel, Checkbox, Grid, Divider, Accordion, AccordionSummary, AccordionDetails,
+  Radio, RadioGroup,
 } from '@mui/material';
 import { ExpandMore, PictureAsPdf, AutoAwesome, WarningAmber } from '@mui/icons-material';
 import api from '../../api/axios';
@@ -27,6 +28,100 @@ export function useTherapistLicense() {
   const [license, setLicense] = useState(null);
   useEffect(() => { api.get('/therapy/me/license').then(({ data }) => setLicense(data)).catch(() => setLicense({ active: false })); }, []);
   return license;
+}
+
+export const blankParams = {
+  sintomas_fisicos: '', sintomas_emocionales: '', duracion: '', funcionamiento: '',
+  consumo_sustancias: '', consumo_detalle: '', riesgo_suicida: '', riesgo_homicida: '', observaciones: '',
+};
+
+// C-SSRS: preguntas 3-5 solo si la 2 es "Sí"; la 7 solo si la 6 es "Sí".
+export function cssrsVisible(index, answers) {
+  if (index >= 2 && index <= 4) return answers[1] === 1;
+  if (index === 6) return answers[5] === 1;
+  return true;
+}
+
+export function InstrumentForm({ inst, answers, onChange }) {
+  return (
+    <Card variant="outlined" sx={{ borderRadius: 2, mb: 2 }}>
+      <CardContent>
+        <Typography variant="subtitle1" fontWeight={700} color="primary.main">{inst.name}</Typography>
+        <Typography variant="body2" color="text.secondary" mb={1.5}>{inst.instructions}</Typography>
+        {inst.questions.map((q, i) => {
+          if (inst.code === 'CSSRS' && !cssrsVisible(i, answers)) return null;
+          return (
+            <Box key={i} sx={{ py: 1, borderTop: i ? '1px solid #EEE' : 'none' }}>
+              <Typography variant="body2" fontWeight={500}>{i + 1}. {q}</Typography>
+              <RadioGroup row value={answers[i] ?? ''} onChange={e => onChange(i, Number(e.target.value))}>
+                {inst.scale.map(s => (
+                  <FormControlLabel key={s.value} value={s.value} control={<Radio size="small" />}
+                    label={<Typography variant="caption">{inst.code === 'CSSRS' ? s.label : `${s.value} · ${s.label}`}</Typography>} />
+                ))}
+              </RadioGroup>
+            </Box>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+}
+
+// Bloque de parámetros básicos, reutilizado por el terapeuta y por el link del paciente.
+export function BasicParamsForm({ params, setParam }) {
+  return (
+    <Grid container spacing={2}>
+      <Grid item xs={12} md={6}><TextField label="Síntomas físicos" fullWidth multiline minRows={2} value={params.sintomas_fisicos} onChange={setParam('sintomas_fisicos')} /></Grid>
+      <Grid item xs={12} md={6}><TextField label="Síntomas emocionales" fullWidth multiline minRows={2} value={params.sintomas_emocionales} onChange={setParam('sintomas_emocionales')} /></Grid>
+      <Grid item xs={12} sm={6} md={3}>
+        <FormControl fullWidth>
+          <InputLabel>Duración de los síntomas</InputLabel>
+          <Select value={params.duracion} label="Duración de los síntomas" onChange={setParam('duracion')}>
+            {['Menos de 2 semanas', '2 a 4 semanas', '1 a 6 meses', 'Más de 6 meses'].map(o => <MenuItem key={o} value={o}>{o}</MenuItem>)}
+          </Select>
+        </FormControl>
+      </Grid>
+      <Grid item xs={12} sm={6} md={3}>
+        <FormControl fullWidth>
+          <InputLabel>Afectación del funcionamiento</InputLabel>
+          <Select value={params.funcionamiento} label="Afectación del funcionamiento" onChange={setParam('funcionamiento')}>
+            {['Sin afectación', 'Leve', 'Moderada', 'Grave'].map(o => <MenuItem key={o} value={o}>{o}</MenuItem>)}
+          </Select>
+        </FormControl>
+      </Grid>
+      <Grid item xs={12} sm={6} md={3}>
+        <FormControl fullWidth>
+          <InputLabel>Consumo de sustancias</InputLabel>
+          <Select value={params.consumo_sustancias} label="Consumo de sustancias" onChange={setParam('consumo_sustancias')}>
+            {['No', 'Ocasional', 'Frecuente', 'Diario'].map(o => <MenuItem key={o} value={o}>{o}</MenuItem>)}
+          </Select>
+        </FormControl>
+      </Grid>
+      <Grid item xs={12} sm={6} md={3}>
+        <TextField label="Sustancia / detalle" fullWidth value={params.consumo_detalle} onChange={setParam('consumo_detalle')}
+          disabled={!params.consumo_sustancias || params.consumo_sustancias === 'No'} />
+      </Grid>
+      <Grid item xs={12} sm={6}>
+        <FormControl fullWidth>
+          <InputLabel>Riesgo suicida observado</InputLabel>
+          <Select value={params.riesgo_suicida} label="Riesgo suicida observado" onChange={setParam('riesgo_suicida')}>
+            <MenuItem value="no">No</MenuItem>
+            <MenuItem value="si">Sí</MenuItem>
+          </Select>
+        </FormControl>
+      </Grid>
+      <Grid item xs={12} sm={6}>
+        <FormControl fullWidth>
+          <InputLabel>Riesgo homicida observado</InputLabel>
+          <Select value={params.riesgo_homicida} label="Riesgo homicida observado" onChange={setParam('riesgo_homicida')}>
+            <MenuItem value="no">No</MenuItem>
+            <MenuItem value="si">Sí</MenuItem>
+          </Select>
+        </FormControl>
+      </Grid>
+      <Grid item xs={12}><TextField label="Observaciones" fullWidth multiline minRows={2} value={params.observaciones} onChange={setParam('observaciones')} /></Grid>
+    </Grid>
+  );
 }
 
 export function LicenseBanner({ license }) {

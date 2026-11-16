@@ -122,4 +122,24 @@ db.transaction(() => { for (const c of DSM_WHITELIST) insertCode.run(c.code, c.n
 
 db.prepare(`INSERT OR IGNORE INTO app_settings (key, value) VALUES ('crisis_resources', ?)`).run(DEFAULT_CRISIS_RESOURCES);
 
+// 3. Links de tamizaje respondidos por el paciente (un solo uso)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS screening_links (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token TEXT NOT NULL UNIQUE,
+    patient_id INTEGER NOT NULL REFERENCES patients(id),
+    therapist_id INTEGER NOT NULL REFERENCES users(id),
+    instruments TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('pendiente','completado')) DEFAULT 'pendiente',
+    screening_id INTEGER REFERENCES screenings(id),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    used_at TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_screening_links_token ON screening_links(token);
+`);
+
+const scrCols = db.pragma('table_info(screenings)').map(c => c.name);
+if (!scrCols.includes('source')) db.exec(`ALTER TABLE screenings ADD COLUMN source TEXT NOT NULL DEFAULT 'terapeuta'`);
+if (!scrCols.includes('viewed_at')) db.exec(`ALTER TABLE screenings ADD COLUMN viewed_at TEXT`);
+
 console.log('Migración Terapeutas completada.');

@@ -152,4 +152,70 @@ function generateScreeningPDF(doc, { screening, patient, therapist, crisisResour
   doc.fontSize(9).font('Helvetica').fillColor(COLORS.muted).text('Firma y sello del profesional', x, y + 60, { width: lineW, align: 'center' });
 }
 
-module.exports = { generateScreeningPDF, DISCLAIMER };
+const SEX_LABEL = { F: 'Femenino', M: 'Masculino', O: 'Otro' };
+const SHORT_INST = { PHQ9: 'PHQ-9', GAD7: 'GAD-7', PCL5: 'PCL-5', CSSRS: 'C-SSRS' };
+
+// Ficha del paciente: datos generales + historial resumido de tamizajes (sin análisis de IA).
+function generatePatientFichaPDF(doc, { patient, therapist, screenings }) {
+  let y = drawHeader(doc, 'Ficha de Paciente', `Expediente ${patient.code}`);
+  const rows = [
+    ['Código de paciente:', patient.code],
+    ['Nombre completo:', patient.full_name],
+    ['Fecha de nacimiento:', patient.birth_date || '—'],
+    ['Sexo:', SEX_LABEL[patient.sex] || '—'],
+    ['Teléfono:', patient.phone || '—'],
+    ['Correo:', patient.email || '—'],
+    ['Consentimiento informado:', patient.consent ? `Sí (${patient.consent_date || 'sin fecha'})` : 'No registrado'],
+    ['Terapeuta responsable:', therapist.full_name],
+    ['Motivo de consulta:', patient.consultation_reason || '—'],
+    ['Antecedentes relevantes:', patient.background || '—'],
+    ['Medicación actual:', patient.medication || '—'],
+  ];
+  for (const [label, value] of rows) y = drawSection(doc, y, label, value);
+  y += 6;
+
+  y = heading(doc, y, 'HISTORIAL DE TAMIZAJES');
+  if (!screenings.length) {
+    y = paragraph(doc, y, 'El paciente aún no registra tamizajes.', { color: COLORS.muted });
+  }
+  for (const s of screenings) {
+    const results = s.results || [];
+    const resumen = results.map(r =>
+      r.code === 'CSSRS' ? `${SHORT_INST[r.code] || r.code}: ${r.severity}` : `${SHORT_INST[r.code] || r.code}: ${r.score}/${r.max} · ${r.severity}`
+    ).join('\n');
+    const riesgo = s.risk_alert ? `RIESGO ${(s.risk_level || '').toUpperCase()}: ${(s.risk_reasons || []).join('; ')}` : 'Sin alerta de riesgo';
+    const hipotesis = s.ai_result?.hipotesis?.length
+      ? `Hipótesis: ${s.ai_result.hipotesis.map(h => `${h.codigo_cie10} ${h.nombre}`).join('; ')}`
+      : null;
+
+    const lines = [
+      `#${s.id} · ${fmtDateTime(s.screened_at)} · Origen: ${s.source === 'link' ? 'Respondido por el paciente' : 'Registrado por el terapeuta'}`,
+      resumen,
+      riesgo,
+      hipotesis,
+      s.notes ? `Notas: ${s.notes}` : null,
+    ].filter(Boolean).join('\n');
+
+    const text = lines;
+    doc.fontSize(9).font('Helvetica');
+    const h = doc.heightOfString(text, { width: doc.page.width - 110 }) + 14;
+    y = ensureSpace(doc, y, h + 10);
+    doc.rect(40, y, 4, h).fill(s.risk_alert ? '#C62828' : COLORS.primary);
+    doc.rect(44, y, doc.page.width - 84, h).fill('#F7F9FC');
+    doc.fillColor(COLORS.text).text(text, 56, y + 7, { width: doc.page.width - 110 });
+    y += h + 8;
+  }
+
+  y = ensureSpace(doc, y + 6, 60);
+  y = drawBox(doc, y, DISCLAIMER, '#FFFDE7', '#F9A825');
+
+  // Firma del terapeuta
+  y = ensureSpace(doc, y + 30, 80);
+  const lineW = 220;
+  const x = (doc.page.width - lineW) / 2;
+  doc.moveTo(x, y + 40).lineTo(x + lineW, y + 40).strokeColor(COLORS.secondary).stroke();
+  doc.fontSize(10).font('Helvetica-Bold').fillColor(COLORS.text).text(therapist.full_name, x, y + 46, { width: lineW, align: 'center' });
+  doc.fontSize(9).font('Helvetica').fillColor(COLORS.muted).text('Firma y sello del profesional', x, y + 60, { width: lineW, align: 'center' });
+}
+
+module.exports = { generateScreeningPDF, generatePatientFichaPDF, DISCLAIMER };

@@ -10,7 +10,7 @@ const { todayGT, timestampGT } = require('../utils/dates');
 const { scoreInstrument, evaluateRisk, filterHypotheses, publicInstruments, DEFAULT_CRISIS_RESOURCES } = require('../utils/screening');
 const { generateScreeningAnalysis } = require('../utils/ai');
 const { drawWatermark } = require('../utils/pdf');
-const { generateScreeningPDF } = require('../utils/pdf_screening');
+const { generateScreeningPDF, generatePatientFichaPDF } = require('../utils/pdf_screening');
 
 const requireTherapist = requireRole('TERAPEUTA');
 
@@ -224,6 +224,7 @@ router.get('/patients', verifyToken, requireTherapist, (req, res) => {
   const rows = db.prepare(`
     SELECT p.*,
       (SELECT COUNT(*) FROM screenings s WHERE s.patient_id = p.id) AS screenings_count,
+      (SELECT COUNT(*) FROM screenings s WHERE s.patient_id = p.id AND s.source = 'link' AND s.viewed_at IS NULL) AS pending_new,
       (SELECT MAX(s.screened_at) FROM screenings s WHERE s.patient_id = p.id) AS last_screening_at
     FROM patients p
     WHERE p.therapist_id = ? AND (p.code LIKE ? OR p.full_name LIKE ?)
@@ -271,6 +272,41 @@ router.put('/patients/:id', verifyToken, requireTherapist, requireLicense, patie
   `).run(...patientFields({ ...req.body, consent_date: req.body.consent_date || patient.consent_date }), patient.id);
   audit(req.user.id, 'UPDATE_PATIENT', 'patient', patient.id, null);
   res.json(db.prepare(`SELECT * FROM patients WHERE id = ?`).get(patient.id));
+});
+
+// Link para que el paciente responda el tamizaje (un solo uso).
+router.post('/patients/:id/links', verifyToken, requireTherapist, requireLicense, [
+  body('instruments').isArray({ min: 1 }).withMessage('Seleccione al menos un instrumento'),
+], (req, res) => {
+  if (!validate(req, res)) return;
+  const patient = ownPatient(req, res);
+  if (!patient) return;
+  const known = new Set(publicInstruments().map(i => i.code));
+  const codes = [...new Set(req.body.instruments)].filter(c => known.has(c));
+  if (!codes.length) return res.status(400).json({ message: 'Instrumentos inválidos' });
+  const token = uuidv4().replace(/-/g, '');
+  db.prepare(`INSERT INTO screening_links (token, patient_id, therapist_id, instruments) VALUES (?, ?, ?, ?)`)
+    .run(token, patient.id, req.user.id, JSON.stringify(codes));
+  audit(req.user.id, 'CREATE_SCREENING_LINK', 'patient', patient.id, { instruments: codes });
+  res.status(201).json({ token });
+});
+
+// Ficha del paciente en PDF: datos + historial resumido de tamizajes.
+router.get('/patients/:id/ficha.pdf', verifyToken, requireTherapist, (req, res) => {
+  const patient = ownPatient(req, res);
+  if (!patient) return;
+  const screenings = db.prepare(`SELECT * FROM screenings WHERE patient_id = ? ORDER BY screened_at, id`).all(patient.id).map(parseScreening);
+  const therapist = db.prepare(`SELECT full_name FROM users WHERE id = ?`).get(req.user.id);
+  audit(req.user.id, 'EXPORT_FICHA', 'patient', patient.id, null);
+
+  const doc = new PDFDocument({ margin: 40, size: 'LETTER', bufferPages: true });
+  drawWatermark(doc);
+  doc.on('pageAdded', () => drawWatermark(doc));
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `${req.query.view === 'true' ? 'inline' : 'attachment'}; filename="ficha_${patient.code}.pdf"`);
+  doc.pipe(res);
+  generatePatientFichaPDF(doc, { patient, therapist, screenings });
+  doc.end();
 });
 
 router.get('/patients/:id', verifyToken, requireTherapist, (req, res) => {
@@ -368,6 +404,10 @@ function ownScreening(req, res) {
 router.get('/screenings/:id', verifyToken, requireTherapist, (req, res) => {
   const s = ownScreening(req, res);
   if (!s) return;
+  if (s.source === 'link' && !s.viewed_at) {
+    db.prepare(`UPDATE screenings SET viewed_at = ? WHERE id = ?`).run(timestampGT(), s.id);
+    s.viewed_at = timestampGT();
+  }
   audit(req.user.id, 'VIEW_SCREENING', 'screening', s.id, null);
   res.json({ ...screeningDetail(s.id), crisis_resources: s.risk_alert ? getCrisisResources() : null });
 });
@@ -398,3 +438,7 @@ router.get('/screenings/:id/pdf', verifyToken, requireTherapist, (req, res) => {
 });
 
 module.exports = router;
+// Compartidos con el endpoint público /api/screening-link.
+module.exports.runScreeningAnalysis = runAnalysis;
+module.exports.audit = audit;
+module.exports.getActiveLicense = getActiveLicense;

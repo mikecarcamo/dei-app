@@ -23,6 +23,7 @@ import Reports from './pages/admin/Reports';
 import EmpresaEvents from './pages/admin/EmpresaEvents';
 import Therapists from './pages/admin/Therapists';
 
+import PublicScreening from './pages/PublicScreening';
 import Screening from './pages/therapist/Screening';
 import Patients from './pages/therapist/Patients';
 import PatientDetail from './pages/therapist/PatientDetail';
@@ -74,6 +75,7 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/encuesta/:code" element={<ClimaSurvey />} />
+            <Route path="/tamizaje/:token" element={<PublicScreening />} />
 
             {/* Cambio de contraseña — cualquier usuario autenticado */}
             <Route element={<ProtectedRoute />}>

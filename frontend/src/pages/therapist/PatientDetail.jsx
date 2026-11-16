@@ -4,8 +4,9 @@ import {
   Box, Typography, Button, Card, CardContent, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Chip, CircularProgress, Alert, Grid, Dialog, DialogContent, DialogActions, IconButton, Tooltip,
 } from '@mui/material';
-import { ArrowBack, Edit, FactCheck, Visibility, WarningAmber } from '@mui/icons-material';
+import { ArrowBack, Edit, FactCheck, Visibility, WarningAmber, Description, Link as LinkIcon } from '@mui/icons-material';
 import api from '../../api/axios';
+import PdfViewerModal, { openOrDownloadPdf } from '../../components/PdfViewerModal';
 import { PatientDialog, ScreeningResult, LicenseBanner, useTherapistLicense, fmtDateTime, severityColor } from './common';
 
 const SEX = { F: 'Femenino', M: 'Masculino', O: 'Otro' };
@@ -19,6 +20,7 @@ export default function PatientDetail() {
   const [error, setError] = useState('');
   const [editOpen, setEditOpen] = useState(false);
   const [viewing, setViewing] = useState(null);
+  const [pdfViewer, setPdfViewer] = useState(null);
 
   const load = () => api.get(`/therapy/patients/${id}`).then(({ data }) => setData(data)).catch(e => setError(e.response?.data?.message || 'Error al cargar'));
   useEffect(() => { load(); }, [id]);
@@ -26,6 +28,15 @@ export default function PatientDetail() {
   const openScreening = async (s) => {
     const { data: detail } = await api.get(`/therapy/screenings/${s.id}`);
     setViewing(detail);
+  };
+
+  const openFicha = async () => {
+    const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+    const url = `${baseURL}/therapy/patients/${id}/ficha.pdf`;
+    const token = localStorage.getItem('dei_token');
+    const filename = `ficha_${data.code}.pdf`;
+    const viewUrl = await openOrDownloadPdf({ url, filename, token });
+    if (viewUrl) setPdfViewer({ url, title: `Ficha ${data.code} — ${data.full_name}`, filename, token });
   };
 
   if (error) return <Alert severity="error">{error}</Alert>;
@@ -50,6 +61,7 @@ export default function PatientDetail() {
               <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace' }}>{data.code}</Typography>
             </Box>
             <Box display="flex" gap={1}>
+              <Button variant="outlined" startIcon={<Description />} onClick={openFicha}>Ficha</Button>
               <Button variant="outlined" startIcon={<Edit />} onClick={() => setEditOpen(true)} disabled={!license?.active}>Editar</Button>
               <Button variant="contained" startIcon={<FactCheck />} onClick={() => navigate(`/terapeuta/tamizaje?patient=${data.id}`)} disabled={!license?.active}>Nuevo tamizaje</Button>
             </Box>
@@ -85,7 +97,11 @@ export default function PatientDetail() {
               {data.screenings.map(s => (
                 <TableRow key={s.id} hover>
                   <TableCell>{s.id}</TableCell>
-                  <TableCell sx={{ fontSize: 13, whiteSpace: 'nowrap' }}>{fmtDateTime(s.screened_at)}</TableCell>
+                  <TableCell sx={{ fontSize: 13, whiteSpace: 'nowrap' }}>
+                    {fmtDateTime(s.screened_at)}
+                    {s.source === 'link' && !s.viewed_at && <Chip label="Nuevo" color="primary" size="small" sx={{ height: 18, fontSize: 10, ml: 0.5 }} />}
+                    {s.source === 'link' && s.viewed_at && <Chip label="Link" size="small" variant="outlined" sx={{ height: 18, fontSize: 10, ml: 0.5 }} />}
+                  </TableCell>
                   <TableCell sx={{ fontSize: 13 }}>{s.therapist_name}</TableCell>
                   <TableCell>
                     <Box display="flex" gap={0.5} flexWrap="wrap">
@@ -123,6 +139,11 @@ export default function PatientDetail() {
         </DialogContent>
         <DialogActions><Button onClick={() => setViewing(null)}>Cerrar</Button></DialogActions>
       </Dialog>
+
+      {pdfViewer && (
+        <PdfViewerModal open={!!pdfViewer} url={pdfViewer.url} title={pdfViewer.title}
+          token={pdfViewer.token} filename={pdfViewer.filename} onClose={() => setPdfViewer(null)} />
+      )}
     </Box>
   );
 }
