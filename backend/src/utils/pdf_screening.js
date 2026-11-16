@@ -209,19 +209,20 @@ function generatePatientFichaPDF(doc, { patient, therapist, screenings }) {
 
 // Firma y sello: imagen del terapeuta (si la subió) sobre la línea + nombre completo.
 function drawTherapistSignature(doc, y, therapist) {
-  y = ensureSpace(doc, y + 30, 120);
-  const lineW = 220;
-  const x = (doc.page.width - lineW) / 2;
-  let lineY = y + 40;
+  y = ensureSpace(doc, y + 30, 140);
+  const w = 280;
+  const x = (doc.page.width - w) / 2;
+  let nameY = y + 40;
   if (therapist.signature_image) {
     try {
-      doc.image(Buffer.from(therapist.signature_image.split(',')[1], 'base64'), x, y - 6, { fit: [lineW, 56], align: 'center' });
-      lineY = y + 52;
-    } catch (e) { /* imagen inválida: solo línea y nombre */ }
+      doc.image(Buffer.from(therapist.signature_image.split(',')[1], 'base64'), x, y - 4, { fit: [w, 84], align: 'center' });
+      nameY = y + 82;
+    } catch (e) { /* imagen inválida: solo nombre */ }
+  } else {
+    doc.moveTo(x + 30, nameY).lineTo(x + w - 30, nameY).strokeColor(COLORS.secondary).stroke();
+    nameY += 6;
   }
-  doc.moveTo(x, lineY).lineTo(x + lineW, lineY).strokeColor(COLORS.secondary).stroke();
-  doc.fontSize(10).font('Helvetica-Bold').fillColor(COLORS.text).text(therapist.full_name, x, lineY + 6, { width: lineW, align: 'center' });
-  doc.fontSize(9).font('Helvetica').fillColor(COLORS.muted).text('Firma y sello del profesional', x, lineY + 20, { width: lineW, align: 'center' });
+  doc.fontSize(11).font('Helvetica-Bold').fillColor(COLORS.text).text(therapist.full_name, x, nameY, { width: w, align: 'center' });
 }
 
 module.exports = { generateScreeningPDF, generatePatientFichaPDF, DISCLAIMER };
