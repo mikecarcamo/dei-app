@@ -263,6 +263,8 @@ export default function Manual() {
                   <Typography variant="caption" display="block">Requiere completar: Situación actual, Desarrollo, Plan de trabajo y Observaciones.</Typography>
                   <Typography variant="caption" display="block" fontWeight={700} mt={0.5}>Cancelada por paciente · Cancelada por terapeuta · Anulada</Typography>
                   <Typography variant="caption" display="block">Solo se piden las Observaciones (motivo).</Typography>
+                  <Typography variant="caption" display="block" fontWeight={700} mt={0.5}>Documentos adjuntos</Typography>
+                  <Typography variant="caption" display="block">Opcional en cualquier cierre: botón "Adjuntar" (máx. 5 archivos de 5 MB). Quedan guardados en la cita y se descargan desde su detalle.</Typography>
                 </Paper>
               ) },
               { label: 'Colores', body: 'Azul = Agendada · Verde = Celebrada · Naranja = Cancelada · Gris = Anulada · Gris rayado = horario bloqueado.' },

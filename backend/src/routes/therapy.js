@@ -576,12 +576,37 @@ router.put('/appointments/:id/close', verifyToken, requireTherapist, requireLice
   } else if (!observaciones || !String(observaciones).trim()) {
     return res.status(400).json({ message: `Para "${CLOSE_LABELS[outcome]}" indique las Observaciones` });
   }
-  db.prepare(`
-    UPDATE appointments SET status = ?, situacion_actual = ?, desarrollo = ?, plan_trabajo = ?, observaciones = ?, closed_at = ?, updated_at = ?
-    WHERE id = ?
-  `).run(outcome, situacion_actual || null, desarrollo || null, plan_trabajo || null, observaciones, timestampGT(), timestampGT(), a.id);
-  audit(req.user.id, 'CLOSE_APPOINTMENT', 'appointment', a.id, { outcome });
+  const docs = Array.isArray(req.body.documents) ? req.body.documents : [];
+  if (docs.length > 5) return res.status(400).json({ message: 'Máximo 5 documentos por cita' });
+  for (const d of docs) {
+    if (!d?.filename || typeof d.data !== 'string' || !d.data.startsWith('data:')) {
+      return res.status(400).json({ message: 'Documento adjunto inválido' });
+    }
+    if (d.data.length > 6_800_000) return res.status(400).json({ message: `El archivo "${d.filename}" supera el máximo de 5 MB` });
+  }
+  db.transaction(() => {
+    db.prepare(`
+      UPDATE appointments SET status = ?, situacion_actual = ?, desarrollo = ?, plan_trabajo = ?, observaciones = ?, closed_at = ?, updated_at = ?
+      WHERE id = ?
+    `).run(outcome, situacion_actual || null, desarrollo || null, plan_trabajo || null, observaciones, timestampGT(), timestampGT(), a.id);
+    const ins = db.prepare(`INSERT INTO appointment_documents (appointment_id, filename, mime, data_url) VALUES (?, ?, ?, ?)`);
+    for (const d of docs) ins.run(a.id, String(d.filename).slice(0, 200), d.mime || null, d.data);
+  })();
+  audit(req.user.id, 'CLOSE_APPOINTMENT', 'appointment', a.id, { outcome, documents: docs.length });
   res.json(db.prepare(`SELECT a.*, p.full_name AS patient_name, p.code AS patient_code FROM appointments a JOIN patients p ON p.id = a.patient_id WHERE a.id = ?`).get(a.id));
+});
+
+router.get('/appointments/:id/documents', verifyToken, requireTherapist, (req, res) => {
+  const a = ownAppointment(req, res);
+  if (!a) return;
+  res.json(db.prepare(`SELECT id, filename, mime, data_url, created_at FROM appointment_documents WHERE appointment_id = ? ORDER BY id`).all(a.id));
+});
+
+router.delete('/appointments/:id/documents/:docId', verifyToken, requireTherapist, (req, res) => {
+  const a = ownAppointment(req, res);
+  if (!a) return;
+  db.prepare(`DELETE FROM appointment_documents WHERE id = ? AND appointment_id = ?`).run(req.params.docId, a.id);
+  res.json({ ok: true });
 });
 
 router.post('/blocks', verifyToken, requireTherapist, requireLicense, (req, res) => {

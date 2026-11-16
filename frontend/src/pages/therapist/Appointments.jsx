@@ -4,7 +4,7 @@ import {
   TextField, Alert, CircularProgress, FormControl, InputLabel, Select, MenuItem,
   Chip, Radio, RadioGroup, FormControlLabel, Divider, Tooltip, IconButton,
 } from '@mui/material';
-import { Add, Block, EventAvailable, Delete } from '@mui/icons-material';
+import { Add, Block, EventAvailable, Delete, AttachFile, InsertDriveFile } from '@mui/icons-material';
 import { Calendar, dayjsLocalizer, Views } from 'react-big-calendar';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import dayjs from 'dayjs';
@@ -118,22 +118,42 @@ function NewAppointmentDialog({ open, patients, initialSlot, onClose, onSaved })
   );
 }
 
+const readFileAsDataUrl = (file) => new Promise((resolve, reject) => {
+  const fr = new FileReader();
+  fr.onload = () => resolve(fr.result);
+  fr.onerror = reject;
+  fr.readAsDataURL(file);
+});
+
 function CloseAppointmentDialog({ open, appt, onClose, onSaved }) {
   const [outcome, setOutcome] = useState('celebrada');
   const [form, setForm] = useState({ situacion_actual: '', desarrollo: '', plan_trabajo: '', observaciones: '' });
+  const [docs, setDocs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (open) { setOutcome('celebrada'); setForm({ situacion_actual: '', desarrollo: '', plan_trabajo: '', observaciones: '' }); setError(''); }
+    if (open) { setOutcome('celebrada'); setForm({ situacion_actual: '', desarrollo: '', plan_trabajo: '', observaciones: '' }); setDocs([]); setError(''); }
   }, [open]);
 
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
 
+  const addFiles = async (fileList) => {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+    if (docs.length + files.length > 5) { setError('Máximo 5 documentos por cita'); return; }
+    for (const f of files) {
+      if (f.size > 5 * 1024 * 1024) { setError(`"${f.name}" supera el máximo de 5 MB`); return; }
+    }
+    const loaded = await Promise.all(files.map(async f => ({ filename: f.name, mime: f.type, data: await readFileAsDataUrl(f) })));
+    setDocs(d => [...d, ...loaded]);
+    setError('');
+  };
+
   const handleSave = async () => {
     setLoading(true); setError('');
     try {
-      await api.put(`/therapy/appointments/${appt.id}/close`, { outcome, ...form });
+      await api.put(`/therapy/appointments/${appt.id}/close`, { outcome, ...form, documents: docs });
       onSaved();
     } catch (e) {
       setError(e.response?.data?.message || 'Error al cerrar la cita');
@@ -169,6 +189,17 @@ function CloseAppointmentDialog({ open, appt, onClose, onSaved }) {
           <Alert severity="info" sx={{ mb: 1 }}>Solo se requiere indicar el motivo en Observaciones.</Alert>
         )}
         <TextField label="Observaciones *" fullWidth margin="dense" multiline minRows={2} value={form.observaciones} onChange={set('observaciones')} />
+        <Divider sx={{ my: 1.5 }} />
+        <Typography variant="subtitle2" fontWeight={700} mb={0.5}>Documentos adjuntos (opcional, máx. 5 de 5 MB)</Typography>
+        <Box display="flex" gap={1} flexWrap="wrap" alignItems="center">
+          <Button component="label" size="small" variant="outlined" startIcon={<AttachFile />}>
+            Adjuntar
+            <input hidden type="file" multiple onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
+          </Button>
+          {docs.map((d, i) => (
+            <Chip key={i} icon={<InsertDriveFile fontSize="small" />} label={d.filename} size="small" onDelete={() => setDocs(dd => dd.filter((_, j) => j !== i))} />
+          ))}
+        </Box>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Volver</Button>
@@ -276,8 +307,14 @@ function DetailDialog({ open, item, onClose, onClose_appt, onReschedule, onDelet
   const [moveTo, setMoveTo] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [docs, setDocs] = useState([]);
 
-  useEffect(() => { if (open) { setMoveTo(''); setError(''); } }, [open, item]);
+  useEffect(() => {
+    setMoveTo(''); setError(''); setDocs([]);
+    if (open && item?.type === 'appt') {
+      api.get(`/therapy/appointments/${item.appt.id}/documents`).then(({ data }) => setDocs(data)).catch(() => {});
+    }
+  }, [open, item]);
   if (!item) return null;
 
   if (item.type === 'block') {
@@ -325,6 +362,18 @@ function DetailDialog({ open, item, onClose, onClose_appt, onReschedule, onDelet
         {a.desarrollo && <Typography variant="body2" mt={0.5}><b>Desarrollo:</b> {a.desarrollo}</Typography>}
         {a.plan_trabajo && <Typography variant="body2" mt={0.5}><b>Plan de trabajo:</b> {a.plan_trabajo}</Typography>}
         {a.observaciones && <Typography variant="body2" mt={0.5}><b>Observaciones:</b> {a.observaciones}</Typography>}
+        {docs.length > 0 && (
+          <>
+            <Divider sx={{ my: 1.5 }} />
+            <Typography variant="subtitle2" fontWeight={700} mb={0.5}>Documentos adjuntos</Typography>
+            <Box display="flex" gap={1} flexWrap="wrap">
+              {docs.map(d => (
+                <Chip key={d.id} icon={<InsertDriveFile fontSize="small" />} label={d.filename} size="small" component="a"
+                  href={d.data_url} download={d.filename} clickable target="_blank" />
+              ))}
+            </Box>
+          </>
+        )}
         {a.status === 'agendada' && (
           <>
             <Divider sx={{ my: 1.5 }} />

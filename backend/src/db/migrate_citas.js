@@ -37,4 +37,16 @@ if (!db.pragma('table_info(appointments)').some(c => c.name === 'category')) {
   db.exec(`ALTER TABLE appointments ADD COLUMN category TEXT NOT NULL DEFAULT 'PRESENCIAL_MENTAL_Z9'`);
 }
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS appointment_documents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    appointment_id INTEGER NOT NULL REFERENCES appointments(id),
+    filename TEXT NOT NULL,
+    mime TEXT,
+    data_url TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_appt_docs ON appointment_documents(appointment_id);
+`);
+
 console.log('Migración Citas completada.');
